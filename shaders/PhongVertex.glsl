@@ -1,26 +1,39 @@
-#version 410 core
-/// @brief the vertex passed in
-layout (location = 0) in vec3 inVert;
-/// @brief the normal passed in
-layout (location = 2) in vec3 inNormal;
-/// @brief the in uv
-layout (location = 1) in vec2 inUV;
+#version 330 core
 /// @brief flag to indicate if model has unit normals if not normalize
 uniform bool Normalize;
 // the eye position of the camera
 uniform vec3 viewerPos;
 /// @brief the current fragment normal for the vert being processed
-out  vec3 fragmentNormal;
+out vec3 fragmentNormal;
+/// @brief the vertex passed in
+layout(location =0)in vec3 inVert;
+/// @brief the normal passed in
+layout(location =2)in vec3 inNormal;
+/// @brief the in uv
+layout(location =1)in vec2 inUV;
+
+struct Materials
+{
+    vec4 ambient;
+    vec4 diffuse;
+    vec4 specular;
+    float shininess;
+};
 
 
 struct Lights
 {
-  vec4 position;
-  vec4 ambient;
-  vec4 diffuse;
-  vec4 specular;
+    vec4 position;
+    vec4 ambient;
+    vec4 diffuse;
+    vec4 specular;
+    float constantAttenuation;
+    float spotCosCutoff;
+    float quadraticAttenuation;
+    float linearAttenuation;
 };
-
+// our material
+uniform Materials material;
 // array of lights
 uniform Lights light;
 // direction of the lights used for shading
@@ -64,4 +77,5 @@ lightDir=vec3(light.position.xyz-eyeCord.xyz);
 dist = length(lightDir);
 lightDir/= dist;
 halfVector = normalize(eyeDirection + lightDir);
+
 }

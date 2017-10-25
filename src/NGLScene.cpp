@@ -131,7 +131,7 @@ void NGLScene::initializeGL()
 
   m_vao->setData(ngl::SimpleVAO::VertexData(normals.size()*sizeof(ngl::Vec3),normals[0].m_x));
   m_vao->setVertexAttributePointer(2,3,GL_FLOAT,0,0);
-  m_vao->setNumIndices(m_data.size());
+  m_vao->setNumIndices(normals.size());
 
 }
 
