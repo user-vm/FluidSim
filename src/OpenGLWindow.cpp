@@ -42,6 +42,73 @@ void OpenGLWindow::initializeGL()
   glewInit();
 
   glClearColor(0.0f, 0.0f, 0.0f, 1.0f);			   // Grey Background
+
+  glEnable(GL_DEPTH_TEST);
+  glEnable(GL_MULTISAMPLE);
+
+  //OpenGLWindow::point3D from(0,1,2);
+  //OpenGLWindow::point3D to(0,0,0);
+  //OpenGLWindow::point3D up(0,1,0);
+
+  //m_cam.set(from,to,up);
+  // set the shape using FOV 45 Aspect Ratio based on Width and Height
+  // The final two are near and far clipping planes of 0.5 and 10
+  //m_cam.setShape(45,720.0f/576.0f,0.001f,150);
+
+  //get vertex shader
+
+  FILE* vertexShaderFile = fopen("shaders/PhongVertex.glsl","r");
+
+  //Getting File Size
+  fseek( vertexShaderFile, 0, SEEK_END );
+  long fileSize = ftell( vertexShaderFile );
+  rewind( vertexShaderFile );
+
+  char* vertexShaderString = (char*)malloc( sizeof( char) * (fileSize+1) );
+  fread( vertexShaderString, sizeof( char ), fileSize, vertexShaderFile );
+  vertexShaderString[fileSize] = '\0';
+  fclose( vertexShaderFile );
+
+  GLuint vertexShaderID = glCreateShader(GL_VERTEX_SHADER);
+  glShaderSource( vertexShaderID, 1, (const GLchar**)&vertexShaderFile, NULL);
+  glCompileShader(vertexShaderID);
+
+  //now fragment shader
+
+  FILE* fragmentShaderFile = fopen("shaders/PhongFragment.glsl","r");
+
+  //Getting File Size
+  fseek( fragmentShaderFile, 0, SEEK_END );
+  fileSize = ftell( fragmentShaderFile );
+  rewind( fragmentShaderFile );
+
+  char* fragmentShaderString = (char*)malloc( sizeof( char) * (fileSize+1) );
+  fread( fragmentShaderString, sizeof( char ), fileSize, fragmentShaderFile );
+  fragmentShaderString[fileSize] = '\0';
+  fclose( fragmentShaderFile );
+
+  GLuint fragmentShaderID = glCreateShader(GL_FRAGMENT_SHADER);
+  glShaderSource( fragmentShaderID, 1, (const GLchar**)&fragmentShaderFile, NULL);
+  glCompileShader(fragmentShaderID);
+
+  //make the shader program and link
+
+  shaderProgramID = glCreateProgram();
+  glAttachShader(shaderProgramID, vertexShaderID);
+  glAttachShader(shaderProgramID, fragmentShaderID);
+  glLinkProgram(shaderProgramID);
+
+  glUseProgram(shaderProgramID);
+  glUniform4f(glGetUniformLocation(shaderProgramID,"material.ambient"),0.5,0.5,0.5,1.0);
+  glUniform4f(glGetUniformLocation(shaderProgramID,"material.diffuse"),0.5,0.5,0.5,1.0);
+  glUniform4f(glGetUniformLocation(shaderProgramID,"material.specular"),0.5,0.5,0.5,1.0);
+  glUniform1f(glGetUniformLocation(shaderProgramID,"material.shininess"),0.5);
+
+  glUniform4f(glGetUniformLocation(shaderProgramID,"light.position"),-4.0,-4.0,-4.0,1.0);
+  glUniform4f(glGetUniformLocation(shaderProgramID,"light.position"),0.5,0.5,0.5,1.0);
+  glUniform4f(glGetUniformLocation(shaderProgramID,"light.position"),0.5,0.5,0.5,1.0);
+  glUniform4f(glGetUniformLocation(shaderProgramID,"light.position"),0.5,0.5,0.5,1.0);
+
   makeGrid(gridSize,steps);
 }
 
@@ -49,111 +116,112 @@ void OpenGLWindow::initializeGL()
 
 void  OpenGLWindow::makeGrid( GLfloat _size, size_t _steps )
 {
-	// allocate enough space for our verts
-	// as we are doing lines it will be 2 verts per line
-	// and we need to add 1 to each of them for the <= loop
-	// and finally muliply by 12 as we have 12 values per line pair
+  // allocate enough space for our verts
+  // as we are doing lines it will be 2 verts per line
+  // and we need to add 1 to each of them for the <= loop
+  // and finally muliply by 12 as we have 12 values per line pair
   int num_cubes=1;
   m_gridSubVBOSize=(_steps+1)*12;
   m_cubeSubVBOSize=3*3*2*6*num_cubes;
   m_vboSize= m_gridSubVBOSize + m_cubeSubVBOSize;
   std::unique_ptr<GLfloat []>vertexData( new GLfloat[m_vboSize]);
-        // k is the index into our data set
+  // k is the index into our data set
   int k=-1;
-        // claculate the step size for each grid value
+  // claculate the step size for each grid value
   float step=_size/static_cast<float>(_steps);
-        // pre-calc the offset for speed
-        float s2=_size/2.0f;
-        // assign v as our value to change each vertex pair
-        float v=-s2;
-        // loop for our grid values
+  // pre-calc the offset for speed
+  float s2=_size/2.0f;
+  // assign v as our value to change each vertex pair
+  float v=-s2;
+  // loop for our grid values
   for(size_t i=0; i<=_steps; ++i)
-        {
-                // vertex 1 x,y,z
-                vertexData[++k]=-s2; // x
-                vertexData[++k]=v; // y
-                vertexData[++k]=0.0; // z
+    {
+      // vertex 1 x,y,z
+      vertexData[++k]=-s2; // x
+      vertexData[++k]=v; // y
+      vertexData[++k]=0.0; // z
 
-		// vertex 2 x,y,z
-		vertexData[++k]=s2; // x
-		vertexData[++k]=v; // y
-		vertexData[++k]=0.0; // z
+      // vertex 2 x,y,z
+      vertexData[++k]=s2; // x
+      vertexData[++k]=v; // y
+      vertexData[++k]=0.0; // z
 
-		// vertex 3 x,y,z
-		vertexData[++k]=v;
-		vertexData[++k]=s2;
-		vertexData[++k]=0.0;
+      // vertex 3 x,y,z
+      vertexData[++k]=v;
+      vertexData[++k]=s2;
+      vertexData[++k]=0.0;
 
-		// vertex 4 x,y,z
-		vertexData[++k]=v;
-		vertexData[++k]=-s2;
-		vertexData[++k]=0.0;
-		// now change our step value
-		v+=step;
-	}
+      // vertex 4 x,y,z
+      vertexData[++k]=v;
+      vertexData[++k]=-s2;
+      vertexData[++k]=0.0;
+      // now change our step value
+      v+=step;
+    }
 
-        std::vector<OpenGLWindow::point3D> verts=
-          {
-            //12 triangles, two for each face
-            //face z=-0.5
-            OpenGLWindow::point3D(0.5,0.5,-0.5),
-            OpenGLWindow::point3D(-0.5,0.5,-0.5),
-            OpenGLWindow::point3D(-0.5,-0.5,-0.5),
-            OpenGLWindow::point3D(0.5,0.5,-0.5),
-            OpenGLWindow::point3D(0.5,-0.5,-0.5),
-            OpenGLWindow::point3D(-0.5,-0.5,-0.5),
-            //face z=0.5
-            OpenGLWindow::point3D(0.5,0.5,0.5),
-            OpenGLWindow::point3D(-0.5,0.5,0.5),
-            OpenGLWindow::point3D(-0.5,-0.5,0.5),
-            OpenGLWindow::point3D(0.5,0.5,0.5),
-            OpenGLWindow::point3D(0.5,-0.5,0.5),
-            OpenGLWindow::point3D(-0.5,-0.5,0.5),
-            //face x=-0.5
-            OpenGLWindow::point3D(-0.5,0.5,0.5),
-            OpenGLWindow::point3D(-0.5,-0.5,0.5),
-            OpenGLWindow::point3D(-0.5,-0.5,-0.5),
-            OpenGLWindow::point3D(-0.5,0.5,0.5),
-            OpenGLWindow::point3D(-0.5,0.5,-0.5),
-            OpenGLWindow::point3D(-0.5,-0.5,-0.5),
-            //face x=0.5
-            OpenGLWindow::point3D(0.5,0.5,0.5),
-            OpenGLWindow::point3D(0.5,-0.5,0.5),
-            OpenGLWindow::point3D(0.5,-0.5,-0.5),
-            OpenGLWindow::point3D(0.5,0.5,0.5),
-            OpenGLWindow::point3D(0.5,0.5,-0.5),
-            OpenGLWindow::point3D(0.5,-0.5,-0.5),
-            //face y=-0.5
-            OpenGLWindow::point3D(0.5,-0.5,0.5),
-            OpenGLWindow::point3D(-0.5,-0.5,0.5),
-            OpenGLWindow::point3D(-0.5,-0.5,-0.5),
-            OpenGLWindow::point3D(0.5,-0.5,0.5),
-            OpenGLWindow::point3D(0.5,-0.5,-0.5),
-            OpenGLWindow::point3D(-0.5,-0.5,-0.5),
-            //face y=0.5
-            OpenGLWindow::point3D(0.5,0.5,0.5),
-            OpenGLWindow::point3D(-0.5,0.5,0.5),
-            OpenGLWindow::point3D(-0.5,0.5,-0.5),
-            OpenGLWindow::point3D(0.5,0.5,0.5),
-            OpenGLWindow::point3D(0.5,0.5,-0.5),
-            OpenGLWindow::point3D(-0.5,0.5,-0.5),
-        };
-        for(size_t i=0;i<verts.size();i++){
-            vertexData[++k]=verts[i].m_x;
-            vertexData[++k]=verts[i].m_y;
-            vertexData[++k]=verts[i].m_z;
-          }
+  std::vector<OpenGLWindow::point3D> verts=
+  {
+    //12 triangles, two for each face
+    //face z=-0.5
+    OpenGLWindow::point3D(0.5,0.5,-0.5),
+    OpenGLWindow::point3D(-0.5,0.5,-0.5),
+    OpenGLWindow::point3D(-0.5,-0.5,-0.5),
+    OpenGLWindow::point3D(0.5,0.5,-0.5),
+    OpenGLWindow::point3D(0.5,-0.5,-0.5),
+    OpenGLWindow::point3D(-0.5,-0.5,-0.5),
+    //face z=0.5
+    OpenGLWindow::point3D(0.5,0.5,0.5),
+    OpenGLWindow::point3D(-0.5,0.5,0.5),
+    OpenGLWindow::point3D(-0.5,-0.5,0.5),
+    OpenGLWindow::point3D(0.5,0.5,0.5),
+    OpenGLWindow::point3D(0.5,-0.5,0.5),
+    OpenGLWindow::point3D(-0.5,-0.5,0.5),
+    //face x=-0.5
+    OpenGLWindow::point3D(-0.5,0.5,0.5),
+    OpenGLWindow::point3D(-0.5,-0.5,0.5),
+    OpenGLWindow::point3D(-0.5,-0.5,-0.5),
+    OpenGLWindow::point3D(-0.5,0.5,0.5),
+    OpenGLWindow::point3D(-0.5,0.5,-0.5),
+    OpenGLWindow::point3D(-0.5,-0.5,-0.5),
+    //face x=0.5
+    OpenGLWindow::point3D(0.5,0.5,0.5),
+    OpenGLWindow::point3D(0.5,-0.5,0.5),
+    OpenGLWindow::point3D(0.5,-0.5,-0.5),
+    OpenGLWindow::point3D(0.5,0.5,0.5),
+    OpenGLWindow::point3D(0.5,0.5,-0.5),
+    OpenGLWindow::point3D(0.5,-0.5,-0.5),
+    //face y=-0.5
+    OpenGLWindow::point3D(0.5,-0.5,0.5),
+    OpenGLWindow::point3D(-0.5,-0.5,0.5),
+    OpenGLWindow::point3D(-0.5,-0.5,-0.5),
+    OpenGLWindow::point3D(0.5,-0.5,0.5),
+    OpenGLWindow::point3D(0.5,-0.5,-0.5),
+    OpenGLWindow::point3D(-0.5,-0.5,-0.5),
+    //face y=0.5
+    OpenGLWindow::point3D(0.5,0.5,0.5),
+    OpenGLWindow::point3D(-0.5,0.5,0.5),
+    OpenGLWindow::point3D(-0.5,0.5,-0.5),
+    OpenGLWindow::point3D(0.5,0.5,0.5),
+    OpenGLWindow::point3D(0.5,0.5,-0.5),
+    OpenGLWindow::point3D(-0.5,0.5,-0.5),
+  };
+  for(size_t i=0;i<verts.size();i++){
+      vertexData[++k]=verts[i].m_x;
+      vertexData[++k]=verts[i].m_y;
+      vertexData[++k]=verts[i].m_z;
+    }
 
-        // now we will create our VBO first we need to ask GL for an Object ID
+  // now we will create our VBO first we need to ask GL for an Object ID
   glGenBuffers(1, &m_vboPointer);
-        // now we bind this ID to an Array buffer
+  // now we bind this ID to an Array buffer
+  //glUseProgram(shaderProgramID);
   glBindBuffer(GL_ARRAY_BUFFER, m_vboPointer);
-        // finally we stuff our data into the array object
-        // First we tell GL it's an array buffer
-        // then the number of bytes we are storing (need to tell it's a sizeof(FLOAT)
-        // then the pointer to the actual data
-        // Then how we are going to draw it (in this case Statically as the data will not change)
-  glBufferData(GL_ARRAY_BUFFER, m_vboSize*sizeof(GL_FLOAT) , vertexData.get(), GL_STATIC_DRAW);
+  // finally we stuff our data into the array object
+  // First we tell GL it's an array buffer
+  // then the number of bytes we are storing (need to tell it's a sizeof(FLOAT)
+  // then the pointer to the actual data
+  // Then how we are going to draw it (in this case Statically as the data will not change)
+  glBufferData(GL_ARRAY_BUFFER, m_vboSize*sizeof(GL_FLOAT) , vertexData.get(), GL_DYNAMIC_DRAW);
 
 }
 
@@ -167,6 +235,7 @@ void OpenGLWindow::paintGL()
   glEnableClientState(GL_VERTEX_ARRAY);
   // bind our VBO data to be the currently active one
   //glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,0,0);
+  glUseProgram(shaderProgramID);
   glVertexPointer(3,GL_FLOAT,0,0);
 
 
@@ -199,9 +268,9 @@ void OpenGLWindow::timerEvent(QTimerEvent *)
 void OpenGLWindow::keyPressEvent(QKeyEvent *_event)
 {
   switch (_event->key())
-  {
-   case Qt::Key_Escape : QApplication::exit(EXIT_SUCCESS); break;
-  }
+    {
+    case Qt::Key_Escape : QApplication::exit(EXIT_SUCCESS); break;
+    }
 }
 
 void OpenGLWindow::resizeGL(int _w, int _h)

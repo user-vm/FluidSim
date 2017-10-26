@@ -66,7 +66,8 @@ class OpenGLWindow : public QOpenGLWindow
      /// @brief sizes of the vbo parts of the cube and grid, respectively; must add up to m_vboSize
      GLint m_cubeSubVBOSize=0;
      GLint m_gridSubVBOSize=0;
-     //vertexData
+     /// @brief ID of shader program
+     GLint shaderProgramID=0;
      //----------------------------------------------------------------------------------------------------------------------
      /// @brief window width from resize event
      //----------------------------------------------------------------------------------------------------------------------
