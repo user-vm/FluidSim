@@ -61,10 +61,12 @@ class OpenGLWindow : public QOpenGLWindow
      void  makeGrid1(GLfloat _size, size_t _steps);
      /// @brief a pointer to our VBO data
      GLuint m_vboPointer=0;
-     GLuint m_vboPointer1=0;
      /// @brief store the size of the vbo data
      GLint m_vboSize=0;
-     GLint m_vboSize1=0;
+     /// @brief sizes of the vbo parts of the cube and grid, respectively; must add up to m_vboSize
+     GLint m_cubeSubVBOSize=0;
+     GLint m_gridSubVBOSize=0;
+     //vertexData
      //----------------------------------------------------------------------------------------------------------------------
      /// @brief window width from resize event
      //----------------------------------------------------------------------------------------------------------------------
