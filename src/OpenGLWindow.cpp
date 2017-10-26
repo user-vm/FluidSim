@@ -12,6 +12,16 @@
 constexpr float gridSize=1.5;
 constexpr int steps=24;
 
+OpenGLWindow::point3D::point3D(GLfloat x, GLfloat y, GLfloat z){
+  m_x = x;
+  m_y = y;
+  m_z = z;
+}
+
+OpenGLWindow::point3D::point3D(){
+  point3D(0.0,0.0,0.0);
+}
+
 OpenGLWindow::OpenGLWindow()
 {
   setTitle("Qt5 compat profile OpenGL 3.2");
@@ -34,7 +44,6 @@ void OpenGLWindow::initializeGL()
 
   glClearColor(0.0f, 0.0f, 0.0f, 1.0f);			   // Grey Background
   makeGrid(gridSize,steps);
-  makeGrid1(gridSize*0.5,steps-3);
 }
 
 
@@ -45,7 +54,7 @@ void  OpenGLWindow::makeGrid( GLfloat _size, size_t _steps )
 	// as we are doing lines it will be 2 verts per line
 	// and we need to add 1 to each of them for the <= loop
 	// and finally muliply by 12 as we have 12 values per line pair
-  m_vboSize= (_steps+2)*12;
+  m_vboSize= (_steps+2)*12+3*3*2*6*num_cubes;;
   std::unique_ptr<GLfloat []>vertexData( new GLfloat[m_vboSize]);
         // k is the index into our data set
   int k=-1;
@@ -81,7 +90,7 @@ void  OpenGLWindow::makeGrid( GLfloat _size, size_t _steps )
 		v+=step;
 	}
 
-
+/*
         // now we will create our VBO first we need to ask GL for an Object ID
   glGenBuffers(1, &m_vboPointer);
         // now we bind this ID to an Array buffer
@@ -93,25 +102,76 @@ void  OpenGLWindow::makeGrid( GLfloat _size, size_t _steps )
         // Then how we are going to draw it (in this case Statically as the data will not change)
   glBufferData(GL_ARRAY_BUFFER, m_vboSize*sizeof(GL_FLOAT) , vertexData.get(), GL_STATIC_DRAW);
 
-}
-
-void  OpenGLWindow::makeGrid1( GLfloat _size, size_t _steps )
-{
 	// allocate enough space for our verts
 	// as we are doing lines it will be 2 verts per line
 	// and we need to add 1 to each of them for the <= loop
-	// and finally muliply by 12 as we have 12 values per line pair
-  m_vboSize1= (_steps+2)*12;
+	// and finally muliply by 12 as we have 12 values per line pair*/
+  //m_vboSize1= (_steps+2)*12;
+  int num_cubes=1;
+  m_vboSize1= 3*3*2*6*num_cubes;//3 vertex coords,3 vertices per face,2 faces per quad, 6 quads per cube
   std::unique_ptr<GLfloat []>vertexData1( new GLfloat[m_vboSize1]);
         // k is the index into our data set
-  int k=-1;
+  //int k=-1;
         // claculate the step size for each grid value
-  float step=_size/static_cast<float>(_steps);
+  //float step=_size/static_cast<float>(_steps);
         // pre-calc the offset for speed
-        float s2=_size/2.0f;
+        //float s2=_size/2.0f;
         // assign v as our value to change each vertex pair
-        float v=-s2;
+        //float v=-s2;
         // loop for our grid values
+  //make a cube
+        std::vector<OpenGLWindow::point3D> verts=
+          {
+            //12 triangles, two for each face
+            //face z=-0.5
+            OpenGLWindow::point3D(0.5,0.5,-0.5),
+            OpenGLWindow::point3D(-0.5,0.5,-0.5),
+            OpenGLWindow::point3D(-0.5,-0.5,-0.5),
+            OpenGLWindow::point3D(0.5,0.5,-0.5),
+            OpenGLWindow::point3D(0.5,-0.5,-0.5),
+            OpenGLWindow::point3D(-0.5,-0.5,-0.5),
+            //face z=0.5
+            OpenGLWindow::point3D(0.5,0.5,0.5),
+            OpenGLWindow::point3D(-0.5,0.5,0.5),
+            OpenGLWindow::point3D(-0.5,-0.5,0.5),
+            OpenGLWindow::point3D(0.5,0.5,0.5),
+            OpenGLWindow::point3D(0.5,-0.5,0.5),
+            OpenGLWindow::point3D(-0.5,-0.5,0.5),
+            //face x=-0.5
+            OpenGLWindow::point3D(-0.5,0.5,0.5),
+            OpenGLWindow::point3D(-0.5,-0.5,0.5),
+            OpenGLWindow::point3D(-0.5,-0.5,-0.5),
+            OpenGLWindow::point3D(-0.5,0.5,0.5),
+            OpenGLWindow::point3D(-0.5,0.5,-0.5),
+            OpenGLWindow::point3D(-0.5,-0.5,-0.5),
+            //face x=0.5
+            OpenGLWindow::point3D(0.5,0.5,0.5),
+            OpenGLWindow::point3D(0.5,-0.5,0.5),
+            OpenGLWindow::point3D(0.5,-0.5,-0.5),
+            OpenGLWindow::point3D(0.5,0.5,0.5),
+            OpenGLWindow::point3D(0.5,0.5,-0.5),
+            OpenGLWindow::point3D(0.5,-0.5,-0.5),
+            //face y=-0.5
+            OpenGLWindow::point3D(0.5,-0.5,0.5),
+            OpenGLWindow::point3D(-0.5,-0.5,0.5),
+            OpenGLWindow::point3D(-0.5,-0.5,-0.5),
+            OpenGLWindow::point3D(0.5,-0.5,0.5),
+            OpenGLWindow::point3D(0.5,-0.5,-0.5),
+            OpenGLWindow::point3D(-0.5,-0.5,-0.5),
+            //face y=0.5
+            OpenGLWindow::point3D(0.5,0.5,0.5),
+            OpenGLWindow::point3D(-0.5,0.5,0.5),
+            OpenGLWindow::point3D(-0.5,0.5,-0.5),
+            OpenGLWindow::point3D(0.5,0.5,0.5),
+            OpenGLWindow::point3D(0.5,0.5,-0.5),
+            OpenGLWindow::point3D(-0.5,0.5,-0.5),
+        };
+        for(size_t i=0;i<verts.size();i++){
+            vertexData[++k]=verts[i].m_x;
+            vertexData[++k]=verts[i].m_y;
+            vertexData[++k]=verts[i].m_z;
+          }
+  /*
   for(size_t i=0; i<=_steps; ++i)
         {
                 // vertex 1 x,y,z
@@ -135,9 +195,26 @@ void  OpenGLWindow::makeGrid1( GLfloat _size, size_t _steps )
 		vertexData1[++k]=0;
 		// now change our step value
 		v+=step;
-	}
+	}*/
 
 
+        /*
+  glGenBuffers(1, &m_vboPointer1);
+  glGenBuffers(1, &m_vboPointer);
+  //glGenVertexArrays
+  //glBindVertexArray(vertexData1.get());
+  glBindBuffer(GL_ARRAY_BUFFER, m_vboPointer1);
+  glBufferData(GL_ARRAY_BUFFER, &m_vboSize1, m_vboPointer1[0], GL_DYNAMIC_DRAW);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+  glEnableVertexAttribArray(0);
+
+
+  glBindVertexArray(vertexData.get());
+  glBindBuffer(GL_ARRAY_BUFFER, m_vboPointer);
+  glBufferData(GL_ARRAY_BUFFER, m_vboSize, m_vboPointer[0], GL_DYNAMIC_DRAW);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+  glEnableVertexAttribArray(0);
+/*
         // now we will create our VBO first we need to ask GL for an Object ID
   glGenBuffers(1, &m_vboPointer1);
         // now we bind this ID to an Array buffer
@@ -147,7 +224,7 @@ void  OpenGLWindow::makeGrid1( GLfloat _size, size_t _steps )
         // then the number of bytes we are storing (need to tell it's a sizeof(FLOAT)
         // then the pointer to the actual data
         // Then how we are going to draw it (in this case Statically as the data will not change)
-  glBufferData(GL_ARRAY_BUFFER, m_vboSize1*sizeof(GL_FLOAT) , vertexData1.get(), GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, m_vboSize1*sizeof(GL_FLOAT) , vertexData1.get(), GL_STATIC_DRAW);*/
 
 }
 
@@ -158,11 +235,9 @@ void OpenGLWindow::paintGL()
   // clear the colour and depth buffers ready to draw.
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   // enable  vertex array drawing
-  //glEnableClientState(GL_VERTEX_ARRAY);
-  glEnableVertexAttribArray(0);
+  glEnableClientState(GL_VERTEX_ARRAY);
   // bind our VBO data to be the currently active one
-  glBindBuffer(GL_ARRAY_BUFFER, m_vboPointer); //USE GLPUSHMATRIX AND DRAW AND POP
-  glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,0,0);
+  //glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,0,0);
   //glVertexPointer(3,GL_FLOAT,0,0);
   glPushMatrix();
   glTranslatef(1.0,0,0);
@@ -170,9 +245,9 @@ void OpenGLWindow::paintGL()
   glScalef(0.5,0.5,0.5);
   glDrawArrays(GL_LINES, 0, m_vboSize);
   glPopMatrix();
-  glEnableVertexAttribArray(2);
-  glBindBuffer(GL_ARRAY_BUFFER, m_vboPointer1);
-  glVertexAttribPointer(2,3,GL_FLOAT,GL_FALSE,0,0);
+  //glEnableVertexAttribArray(2);
+  //glBindBuffer(GL_ARRAY_BUFFER, m_vboPointer1);
+  //glVertexAttribPointer(2,3,GL_FLOAT,GL_FALSE,0,0);
   //glVertexPointer(3,GL_FLOAT,0,0);
   // tell GL how this data is formated in this case 3 floats tightly packed starting at the begining
   // of the data (0 = stride, 0 = offset)

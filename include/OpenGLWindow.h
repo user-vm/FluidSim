@@ -27,6 +27,12 @@ class OpenGLWindow : public QOpenGLWindow
     /// this is only called one time, just after we have a valid GL context use this to init any global GL elements
     //----------------------------------------------------------------------------------------------------------------------
    void initializeGL();
+   class point3D{
+      public:
+        point3D(GLfloat x, GLfloat y, GLfloat z);
+        point3D();
+        GLfloat m_x, m_y, m_z;
+   };
   private:
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief event called by the timer to allow use to re-draw / animate
