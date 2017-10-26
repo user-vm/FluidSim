@@ -52,7 +52,7 @@ class OpenGLWindow : public QOpenGLWindow
      /// @param[in] _step sxstep the spacing between grid points
      /// @param[out] o_dataSize the size of the buffer allocated
      /// @returns a pointer to the allocated VBO
-     void  makeGrid(GLfloat _size, size_t _steps);
+     void  makeCubes(GLfloat _size);
      /// @brief a simple second draw grid function
      /// @param[in] _size the size of the grid (width and height)
      /// @param[in] _step sxstep the spacing between grid points
@@ -63,9 +63,9 @@ class OpenGLWindow : public QOpenGLWindow
      GLuint m_vboPointer=0;
      /// @brief store the size of the vbo data
      GLint m_vboSize=0;
-     /// @brief sizes of the vbo parts of the cube and grid, respectively; must add up to m_vboSize
+     /// @brief size of the subVBO corresponding to a dingle cube
      GLint m_cubeSubVBOSize=0;
-     GLint m_gridSubVBOSize=0;
+     GLint simSize=2;
      /// @brief ID of shader program
      GLint shaderProgramID=0;
      //----------------------------------------------------------------------------------------------------------------------
