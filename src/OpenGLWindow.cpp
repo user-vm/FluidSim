@@ -163,11 +163,6 @@ void  OpenGLWindow::makeCubes( GLfloat _size)
     ngl::Vec3(-0.5,0.5,-0.5),
   };
 
-  std::vector<ngl::Vec3> normals=
-  {
-    +1, -1,
-  }
-
   ngl::Vec3 normalHolder;
   bool xCoeff=false, yCoeff=false, zCoeff=false;
 
@@ -192,7 +187,7 @@ void  OpenGLWindow::makeCubes( GLfloat _size)
 
           //add vertices in three by three, because each vertex in a tri has the same normal vector
 
-          for(t=0;t<2;t++){
+          for(int t=0;t<2;t++){
             //vertex position
             vertexData[++k]=(verts[i+t].m_x+d1*1.1)*_size;
             vertexData[++k]=(verts[i+t].m_y+d2*1.1)*_size;
@@ -204,35 +199,12 @@ void  OpenGLWindow::makeCubes( GLfloat _size)
             vertexData[++k]=verts[i+t].m_z * 2 * zCoeff;
 
             //vertex color
-            vertexData[++k]=d1*1.0/simSize;
-            vertexData[++k]=d2*1.0/simSize;
-            vertexData[++k]=d3*1.0/simSize;
+            vertexData[++k]=0.5 + d1*0.5/simSize;
+            vertexData[++k]=0.5 + d2*0.5/simSize;
+            vertexData[++k]=0.5 + d3*0.5/simSize;
 
               }
-          //vertex
-          vertexData[++k]=(verts[i].m_x+d1*1.1)*_size;
-          vertexData[++k]=(verts[i].m_y+d2*1.1)*_size;
-          vertexData[++k]=(verts[i].m_z+d3*1.1)*_size;
-          //normals; we used the knowledge that they must point outwards
-          if(verts[i].m_x==verts[i+1].m_x&&verts[i+1].m_x==verts[i+2].m_x){
-            vertexData[++k]=Vec3(verts[i].m_x*2,0,0);
-            vertexData[++k]=Vec3(verts[i].m_x*2,0,0);
-            vertexData[++k]=Vec3(verts[i].m_x*2,0,0);
-            }
-          else
-            if(verts[i].m_y==verts[i+1].m_y&&verts[i+1].m_y==verts[i+2].m_y){
-              vertexData[++k]=Vec3(0,verts[i].m_y*2,0);
-              vertexData[++k]=Vec3(0,verts[i].m_y*2,0);
-              vertexData[++k]=Vec3(0,verts[i].m_y*2,0);
-              }
-            else
-              if(verts[i].m_z==verts[i+1].m_z&&verts[i+1].m_z==verts[i+2].m_z){
-                vertexData[++k]=Vec3(0,0,verts[i].m_z*2);
-                vertexData[++k]=Vec3(0,0,verts[i].m_z*2);
-                vertexData[++k]=Vec3(0,0,verts[i].m_z*2);
-              }
-          //colours
-          vertexData[++k]=Vec3()
+
     }
 
   // now we will create our VBO first we need to ask GL for an Object ID
@@ -263,7 +235,11 @@ void OpenGLWindow::paintGL()
   // bind our VBO data to be the currently active one
   //glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,0,0);
   glUseProgram(shaderProgramID);
-  glVertexPointer(3,GL_FLOAT,0,0);
+  glVertexPointer(3,GL_FLOAT,0,6*sizeof(GL_FLOAT)); //SET THE STRIDE
+
+  //glNormalPointer
+
+  //glColorPointer
 
   //glDrawArrays( GL_LINES, 0, m_gridSubVBOSize/3);
 
