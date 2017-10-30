@@ -37,69 +37,6 @@ void OpenGLWindow::initializeGL()
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_MULTISAMPLE);
 
-  //ngl::Vec3 from(0,1,2);
-  //ngl::Vec3 to(0,0,0);
-  //ngl::Vec3 up(0,1,0);
-
-  //m_cam.set(from,to,up);
-  // set the shape using FOV 45 Aspect Ratio based on Width and Height
-  // The final two are near and far clipping planes of 0.5 and 10
-  //m_cam.setShape(45,720.0f/576.0f,0.001f,150);
-
-  //get vertex shader
-/*
-  FILE* vertexShaderFile = fopen("shaders/PhongVertex.glsl","r");
-
-  //Getting File Size
-  fseek( vertexShaderFile, 0, SEEK_END );
-  long fileSize = ftell( vertexShaderFile );
-  rewind( vertexShaderFile );
-
-  char* vertexShaderString = (char*)malloc( sizeof( char) * (fileSize+1) );
-  fread( vertexShaderString, sizeof( char ), fileSize, vertexShaderFile );
-  vertexShaderString[fileSize] = '\0';
-  fclose( vertexShaderFile );
-
-  GLuint vertexShaderID = glCreateShader(GL_VERTEX_SHADER);
-  glShaderSource( vertexShaderID, 1, (const GLchar**)&vertexShaderFile, NULL);
-  glCompileShader(vertexShaderID);
-
-  //now fragment shader
-
-  FILE* fragmentShaderFile = fopen("shaders/PhongFragment.glsl","r");
-
-  //Getting File Size
-  fseek( fragmentShaderFile, 0, SEEK_END );
-  fileSize = ftell( fragmentShaderFile );
-  rewind( fragmentShaderFile );
-
-  char* fragmentShaderString = (char*)malloc( sizeof( char) * (fileSize+1) );
-  fread( fragmentShaderString, sizeof( char ), fileSize, fragmentShaderFile );
-  fragmentShaderString[fileSize] = '\0';
-  fclose( fragmentShaderFile );
-
-  GLuint fragmentShaderID = glCreateShader(GL_FRAGMENT_SHADER);
-  glShaderSource( fragmentShaderID, 1, (const GLchar**)&fragmentShaderFile, NULL);
-  glCompileShader(fragmentShaderID);
-
-  //make the shader program and link
-
-  shaderProgramID = glCreateProgram();
-  glAttachShader(shaderProgramID, vertexShaderID);
-  glAttachShader(shaderProgramID, fragmentShaderID);
-  glLinkProgram(shaderProgramID);
-
-  glUseProgram(shaderProgramID);
-  glUniform4f(glGetUniformLocation(shaderProgramID,"material.ambient"),0.5,0.5,0.5,1.0);
-  glUniform4f(glGetUniformLocation(shaderProgramID,"material.diffuse"),0.5,0.5,0.5,1.0);
-  glUniform4f(glGetUniformLocation(shaderProgramID,"material.specular"),0.5,0.5,0.5,1.0);
-  glUniform1f(glGetUniformLocation(shaderProgramID,"material.shininess"),0.5);
-
-  glUniform4f(glGetUniformLocation(shaderProgramID,"light.position"),-4.0,-4.0,-4.0,1.0);
-  glUniform4f(glGetUniformLocation(shaderProgramID,"light.position"),0.5,0.5,0.5,1.0);
-  glUniform4f(glGetUniformLocation(shaderProgramID,"light.position"),0.5,0.5,0.5,1.0);
-  glUniform4f(glGetUniformLocation(shaderProgramID,"light.position"),0.5,0.5,0.5,1.0);
-*/
   makeCubes(cubeSize);
 }
 
@@ -113,9 +50,43 @@ void  OpenGLWindow::makeCubes( GLfloat _size)
   // and finally muliply by 12 as we have 12 values per line pair
   qint64 k=-1;
   m_cubeSubVBOSize=3*3*2*6*3;//3 coordinates per vertex, 3 vertices per tri, 2 tris per quad, 6 quads per cube, 3 data types (vertex, normal, colour)
-  m_vboSize= m_cubeSubVBOSize*simSize*simSize*simSize*3;
+  m_vboSize= m_cubeSubVBOSize*xSimSize*ySimSize*zSimSize*3;
 
   std::unique_ptr<GLfloat []>vertexData( new GLfloat[m_vboSize]);
+
+  //the simulation uses a staggered MAC grid
+  //the p values are at the center of the grid cells (p[i][j][k] = p_i,j,k)
+  //p = new GLfloat[xSimSize][ySimSize][zSimSize];
+
+  p.resize(xSimSize);
+  u.resize(xSimSize+1);
+  v.resize(xSimSize);
+  w.resize(xSimSize);
+
+  for(int i=0;i<xSimSize;i++){
+    p[i].resize(ySimSize);
+    u[i].resize(ySimSize);
+    v[i].resize(ySimSize+1);
+    w[i].resize(ySimSize);
+    for(int j=0;j<ySimSize;j++){
+      p[i][j].resize(zSimSize);
+      u[i][j].resize(zSimSize);
+      v[i][j].resize(zSimSize);
+      w[i][j].resize(zSimSize+1);}
+  }
+
+  for(int i=0;i<xSimSize;i++){
+      v[i][ySimSize].resize(zSimSize);
+    }
+
+  u[xSimSize].resize(zSimSize);
+  for(int j=0;j<ySimSize;j++)
+    u[xSimSize][j].resize(zSimSize);
+
+  //the u,v,w values are at the centers of the faces that delimit cells (u[i][j][k] = u_i-1/2,j,k; v[i][j][k] = v_i,j-1/2,k; w[i][j][k] = w_i,j,k-1/2)
+  //u = new float[xSimSize+1][ySimSize][zSimSize];
+  //v = new float[xSimSize][ySimSize+1][zSimSize];
+  //w = new float[xSimSize][ySimSize][zSimSize+1];
 
   std::vector<ngl::Vec3> verts=
   {
@@ -169,9 +140,9 @@ void  OpenGLWindow::makeCubes( GLfloat _size)
 
   //we will interleave the vertex, normal and colour data
 
-  for(size_t d1=0;d1<simSize;d1++)
-    for(size_t d2=0;d2<simSize;d2++)
-      for(size_t d3=0;d3<simSize;d3++)
+  for(size_t d1=0;d1<xSimSize;d1++)
+    for(size_t d2=0;d2<ySimSize;d2++)
+      for(size_t d3=0;d3<zSimSize;d3++)
         for(size_t i=0;i<verts.size();i+=3){
           //figure out what the normals will be
 
@@ -190,9 +161,9 @@ void  OpenGLWindow::makeCubes( GLfloat _size)
 
           for(int t=0;t<3;t++){
             //vertex position
-            vertexData[++k]=(verts[i+t].m_x+d1*1 - simSize/2.0)*_size;
-            vertexData[++k]=(verts[i+t].m_y+d2*1 - simSize/2.0)*_size;
-            vertexData[++k]=(verts[i+t].m_z+d3*1 - simSize/2.0)*_size;
+            vertexData[++k]=(verts[i+t].m_x+d1*1 - xSimSize/2.0)*_size;
+            vertexData[++k]=(verts[i+t].m_y+d2*1 - ySimSize/2.0)*_size;
+            vertexData[++k]=(verts[i+t].m_z+d3*1 - zSimSize/2.0)*_size;
 
             //vertex normal; factor of two because each quad center is 0.5 away from cube origin
             vertexData[++k]=verts[i+t].m_x * 2 * xCoeff;
@@ -200,9 +171,9 @@ void  OpenGLWindow::makeCubes( GLfloat _size)
             vertexData[++k]=verts[i+t].m_z * 2 * zCoeff;
 
             //vertex color
-            vertexData[++k]=0.5 + d1*0.5/simSize;// + verts[i+t].m_x;
-            vertexData[++k]=0.5 + d2*0.5/simSize;// + verts[i+t].m_y;
-            vertexData[++k]=0.5 + d3*0.5/simSize;// + verts[i+t].m_z;
+            vertexData[++k]=0.5 + d1*0.5/xSimSize;// + verts[i+t].m_x;
+            vertexData[++k]=0.5 + d2*0.5/ySimSize;// + verts[i+t].m_y;
+            vertexData[++k]=0.5 + d3*0.5/zSimSize;// + verts[i+t].m_z;
 
             std::cout<<vertexData[k]<<"\n";
 
@@ -218,7 +189,6 @@ void  OpenGLWindow::makeCubes( GLfloat _size)
 
   glGenBuffers(1, &m_vboPointer);
   // now we bind this ID to an Array buffer
-  //glUseProgram(shaderProgramID);
   glBindBuffer(GL_ARRAY_BUFFER, m_vboPointer);
   // finally we stuff our data into the array object
   // First we tell GL it's an array buffer
@@ -235,8 +205,6 @@ void  OpenGLWindow::makeCubes( GLfloat _size)
 
 void OpenGLWindow::paintGL()
 {
-  //TODO: update this shit to account for added normal and color data
-  //it's also possible that the shaders might work with that added
 
   // set the viewport
   glViewport(m_xOffset,m_yOffset,m_width,m_height);
@@ -247,35 +215,17 @@ void OpenGLWindow::paintGL()
   glEnableClientState(GL_COLOR_ARRAY);
   glEnableClientState(GL_NORMAL_ARRAY);
   // bind our VBO data to be the currently active one
-  //glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,0,0);
+
   //glUseProgram(shaderProgramID);
-  //glBindBuffer(GL_ARRAY_BUFFER, m_vboPointer);
+
   glVertexPointer(3,GL_FLOAT,9*sizeof(GL_FLOAT),(void*)0); //SET THE STRIDE
-  //glBindBuffer(GL_ARRAY_BUFFER, m_vboPointer);
-
-  //glNormalPointer
   glNormalPointer(GL_FLOAT,9*sizeof(GL_FLOAT),(void*)(3*sizeof(GL_FLOAT)));
-  //glBindBuffer(GL_ARRAY_BUFFER, m_vboPointer);
-
-  //glColorPointer
   glColorPointer(3,GL_FLOAT,9*sizeof(GL_FLOAT),(void*)(6*sizeof(GL_FLOAT)));
 
-  //glDrawArrays( GL_LINES, 0, m_gridSubVBOSize/3);
-
-
-  // tell GL how this data is formated in this case 3 floats tightly packed starting at the begining
-  // of the data (0 = stride, 0 = offset)
-  // draw the VBO as a series of GL_LINES starting at 0 in the buffer and _vboSize*GLfloat
-  //glDrawArrays( GL_LINES, 0, m_vboSize);
-  //glEnableClientState(GL_VERTEX_ARRAY);
-  //glBindBuffer(GL_ARRAY_BUFFER, m_vboPointer);
-  //glVertexPointer(3,GL_FLOAT,0,0);
   glPushMatrix();
-  //glTranslatef(1.0,0,3.0);
-  glRotatef(360.0* (m_spin?(timer.elapsed()/5000.0):1),0.0,1.0,0.0);  //* timer.elapsed()/5000
-  glRotatef(45.0,-0.4,1.0,0.0);
-  //glScalef(0.5,0.5,0.5);
-  glDrawArrays(GL_TRIANGLES, 0, simSize*simSize*simSize*m_cubeSubVBOSize*10);
+    glRotatef(360.0* (m_spin?(timer.elapsed()/5000.0):1),0.0,1.0,0.0);  //* timer.elapsed()/5000
+    glRotatef(45.0,-0.4,1.0,0.0);
+    glDrawArrays(GL_TRIANGLES, 0, xSimSize*ySimSize*zSimSize*m_cubeSubVBOSize*10);
   glPopMatrix();
   // now turn off the VBO client state as we have finished with it
   glDisableClientState(GL_NORMAL_ARRAY);
