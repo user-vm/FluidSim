@@ -9,8 +9,9 @@
 #include <memory>
 #include <iostream>
 #include <ngl/Vec3.h>
+#include <QElapsedTimer>
 
-constexpr float cubeSize=0.2;
+constexpr float cubeSize=0.05;
 
 OpenGLWindow::OpenGLWindow()
 {
@@ -31,7 +32,7 @@ void OpenGLWindow::initializeGL()
 {
   glewInit();
 
-  glClearColor(0.0f, 0.0f, 0.0f, 1.0f);			   // Grey Background
+  glClearColor(0.5f, 0.5f, 0.5f, 1.0f);			   // Grey Background
 
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_MULTISAMPLE);
@@ -46,7 +47,7 @@ void OpenGLWindow::initializeGL()
   //m_cam.setShape(45,720.0f/576.0f,0.001f,150);
 
   //get vertex shader
-
+/*
   FILE* vertexShaderFile = fopen("shaders/PhongVertex.glsl","r");
 
   //Getting File Size
@@ -98,7 +99,7 @@ void OpenGLWindow::initializeGL()
   glUniform4f(glGetUniformLocation(shaderProgramID,"light.position"),0.5,0.5,0.5,1.0);
   glUniform4f(glGetUniformLocation(shaderProgramID,"light.position"),0.5,0.5,0.5,1.0);
   glUniform4f(glGetUniformLocation(shaderProgramID,"light.position"),0.5,0.5,0.5,1.0);
-
+*/
   makeCubes(cubeSize);
 }
 
@@ -187,11 +188,11 @@ void  OpenGLWindow::makeCubes( GLfloat _size)
 
           //add vertices in three by three, because each vertex in a tri has the same normal vector
 
-          for(int t=0;t<2;t++){
+          for(int t=0;t<3;t++){
             //vertex position
-            vertexData[++k]=(verts[i+t].m_x+d1*1.1)*_size;
-            vertexData[++k]=(verts[i+t].m_y+d2*1.1)*_size;
-            vertexData[++k]=(verts[i+t].m_z+d3*1.1)*_size;
+            vertexData[++k]=(verts[i+t].m_x+d1*1 - simSize/2.0)*_size;
+            vertexData[++k]=(verts[i+t].m_y+d2*1 - simSize/2.0)*_size;
+            vertexData[++k]=(verts[i+t].m_z+d3*1 - simSize/2.0)*_size;
 
             //vertex normal; factor of two because each quad center is 0.5 away from cube origin
             vertexData[++k]=verts[i+t].m_x * 2 * xCoeff;
@@ -199,15 +200,22 @@ void  OpenGLWindow::makeCubes( GLfloat _size)
             vertexData[++k]=verts[i+t].m_z * 2 * zCoeff;
 
             //vertex color
-            vertexData[++k]=0.5 + d1*0.5/simSize;
-            vertexData[++k]=0.5 + d2*0.5/simSize;
-            vertexData[++k]=0.5 + d3*0.5/simSize;
+            vertexData[++k]=0.5 + d1*0.5/simSize;// + verts[i+t].m_x;
+            vertexData[++k]=0.5 + d2*0.5/simSize;// + verts[i+t].m_y;
+            vertexData[++k]=0.5 + d3*0.5/simSize;// + verts[i+t].m_z;
+
+            std::cout<<vertexData[k]<<"\n";
 
               }
 
     }
 
   // now we will create our VBO first we need to ask GL for an Object ID
+
+  for(size_t i=0;i<verts.size();i++){
+      std::cout<<verts[i].m_x<<" "<<verts[i].m_y<<" "<<verts[i].m_z<<"\n";
+    }
+
   glGenBuffers(1, &m_vboPointer);
   // now we bind this ID to an Array buffer
   //glUseProgram(shaderProgramID);
@@ -219,6 +227,10 @@ void  OpenGLWindow::makeCubes( GLfloat _size)
   // Then how we are going to draw it (in this case Statically as the data will not change)
   glBufferData(GL_ARRAY_BUFFER, m_vboSize*sizeof(GL_FLOAT) , vertexData.get(), GL_DYNAMIC_DRAW);
 
+  if(m_spin == true){
+    startTimer(100);
+    timer.start();}
+
 }
 
 void OpenGLWindow::paintGL()
@@ -227,19 +239,26 @@ void OpenGLWindow::paintGL()
   //it's also possible that the shaders might work with that added
 
   // set the viewport
-  glViewport(0,0,m_width,m_height);
+  glViewport(m_xOffset,m_yOffset,m_width,m_height);
   // clear the colour and depth buffers ready to draw.
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   // enable  vertex array drawing
   glEnableClientState(GL_VERTEX_ARRAY);
+  glEnableClientState(GL_COLOR_ARRAY);
+  glEnableClientState(GL_NORMAL_ARRAY);
   // bind our VBO data to be the currently active one
   //glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,0,0);
-  glUseProgram(shaderProgramID);
-  glVertexPointer(3,GL_FLOAT,0,6*sizeof(GL_FLOAT)); //SET THE STRIDE
+  //glUseProgram(shaderProgramID);
+  //glBindBuffer(GL_ARRAY_BUFFER, m_vboPointer);
+  glVertexPointer(3,GL_FLOAT,9*sizeof(GL_FLOAT),(void*)0); //SET THE STRIDE
+  //glBindBuffer(GL_ARRAY_BUFFER, m_vboPointer);
 
   //glNormalPointer
+  glNormalPointer(GL_FLOAT,9*sizeof(GL_FLOAT),(void*)(3*sizeof(GL_FLOAT)));
+  //glBindBuffer(GL_ARRAY_BUFFER, m_vboPointer);
 
   //glColorPointer
+  glColorPointer(3,GL_FLOAT,9*sizeof(GL_FLOAT),(void*)(6*sizeof(GL_FLOAT)));
 
   //glDrawArrays( GL_LINES, 0, m_gridSubVBOSize/3);
 
@@ -253,12 +272,15 @@ void OpenGLWindow::paintGL()
   //glVertexPointer(3,GL_FLOAT,0,0);
   glPushMatrix();
   //glTranslatef(1.0,0,3.0);
-  glRotatef(30.0,0.0,1.0,1.0);
+  glRotatef(360.0* (m_spin?(timer.elapsed()/5000.0):1),0.0,1.0,0.0);  //* timer.elapsed()/5000
+  glRotatef(45.0,-0.4,1.0,0.0);
   //glScalef(0.5,0.5,0.5);
-  glDrawArrays(GL_TRIANGLES, 0, m_vboSize/3);
+  glDrawArrays(GL_TRIANGLES, 0, simSize*simSize*simSize*m_cubeSubVBOSize*10);
   glPopMatrix();
   // now turn off the VBO client state as we have finished with it
+  glDisableClientState(GL_NORMAL_ARRAY);
   glDisableClientState(GL_VERTEX_ARRAY);
+  glDisableClientState(GL_COLOR_ARRAY);
 }
 
 void OpenGLWindow::timerEvent(QTimerEvent *)
@@ -277,6 +299,8 @@ void OpenGLWindow::keyPressEvent(QKeyEvent *_event)
 void OpenGLWindow::resizeGL(int _w, int _h)
 {
 
-  m_width  = static_cast<int>( _w * devicePixelRatio() );
-  m_height = static_cast<int>( _h * devicePixelRatio() );
+  m_width  = static_cast<int>( ((_w<_h)?_w:_h) * devicePixelRatio() );
+  m_height = static_cast<int>( ((_w<_h)?_w:_h) * devicePixelRatio() );
+  m_xOffset = (_w - m_width)/2;
+  m_yOffset = (_h - m_height) / 2;
 }
