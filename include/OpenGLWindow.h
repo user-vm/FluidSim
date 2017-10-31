@@ -50,16 +50,27 @@ class OpenGLWindow : public QOpenGLWindow
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief a simple draw grid function
     /// @param[in] _size the size of the grid (width and height)
-    /// @param[in] _step sxstep the spacing between grid points
-    /// @param[out] o_dataSize the size of the buffer allocated
     /// @returns a pointer to the allocated VBO
     void  makeCubes(GLfloat _size);
-    /// @brief a simple second draw grid function
-    /// @param[in] _size the size of the grid (width and height)
-    /// @param[in] _step sxstep the spacing between grid points
-    /// @param[out] o_dataSize the size of the buffer allocated
-    /// @returns a pointer to the allocated VBO
-    void  makeGrid1(GLfloat _size, size_t _steps);
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief advection function
+    /// @param[in] args vector of pointers to the data grids to update (velocity component, pressure, temperature, etc.)
+    /// @param[in] isCentered vector of bools, true if corresponding grid data is stored at cell centers (pressure-like) or
+    /// at faces (velocity-like); must have length equal to args
+    /// @returns true on success, false on failure (if args and isCentered don't match)
+    //----------------------------------------------------------------------------------------------------------------------
+    bool advect(std::vector args, std::vector<bool> isCentered);
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief advection function (alternate constructor); takes args to contain u,v,w and p
+    /// @returns true
+    //----------------------------------------------------------------------------------------------------------------------
+    bool advect();
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief projection function
+    //----------------------------------------------------------------------------------------------------------------------
+    void project();
+
+    /// @brief a simple draw grid function
     /// @brief a pointer to our VBO data
     GLuint m_vboPointer=0;
     /// @brief store the size of the vbo data
@@ -103,6 +114,18 @@ class OpenGLWindow : public QOpenGLWindow
     /// @brief the u, v and w velocities (along x, y and z axes, respectively
     //----------------------------------------------------------------------------------------------------------------------
     std::vector<std::vector<std::vector<float>>> u, v, w;
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief the grid temperatures (for smoke simulation)
+    //----------------------------------------------------------------------------------------------------------------------
+    std::vector<std::vector<std::vector<float>>> tm;
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief the timestep
+    //----------------------------------------------------------------------------------------------------------------------
+    float dt;
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief the frame duration (1/framerate)
+    //----------------------------------------------------------------------------------------------------------------------
+    float frameDuration;
   };
 
   #endif

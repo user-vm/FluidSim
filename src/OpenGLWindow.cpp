@@ -40,7 +40,126 @@ void OpenGLWindow::initializeGL()
   makeCubes(cubeSize);
 }
 
+bool OpenGLWindow::advect(){
+  std::vector args;
+  std::vector<bool> isCentered;
+  return advect(args, isCentered);
+}
 
+bool OpenGLWindow::advect(std::vector args, std::vector<bool> isCentered, std::vector<float> outsideValues)
+{
+  // if args is empty, assume only u,v,w and p need to be updated
+  if(args.size()==0){
+      isCentered.clear();
+
+      args.push_back(w);
+      args.push_back(false);
+
+      args.push_back(v);
+      args.push_back(false);
+
+      args.push_back(u);
+      args.push_back(false);
+
+      args.push_back(p);
+      args.push_back(true);
+    }
+  else
+    if(args.size() != isCentered.size()){
+        std::cout<<"args and isCentered mismatch";
+        return false;
+      }
+  int k=0;
+  for(auto c:args){
+
+      if(isCentered[k++]==0){
+
+          ngl::Vec3 velocity;
+
+          for(ix=0;ix<xSimSize;ix++)
+            for(iy=0;iy<ySimSize;iy++)
+              for(iz=0;iz<zSimSize;iz++){
+
+                  // get velocity components at center of current grid cell through trilinear interpolation
+                  velocity.m_x = (u[ix][iy][iz]+u[ix+1][iy][iz])/2;
+                  velocity.m_y = (v[ix][iy][iz]+v[ix][iy+1][iz])/2;
+                  velocity.m_z = (w[ix][iy][iz]+w[ix][iy][iz+1])/2;
+
+                  // the current grid cell (of indices (ix,iy,iz)) is viewed as a particle
+                  // (xn,yn,zn) is the corresponding position of this particle; (xp,yp,zp) is its projected past position a time dt ago
+                  // we use Forward Euler (might update to RK2)
+                  // (ixp,iyp,izp) are the indices of the grid point (xpFloor,ypFloor,zpFloor) such that xp is in [xpFloor, xpFloor+dx), yp is in [ypFloor, ypFloor+dx), zp is in [zpFloor, zpFloor+dx)
+                  xn = dx * (ix + 0.5);
+                  xp = xn - dt * velocity.m_x;
+                  ixp = floor(xp/dx - 0.5);
+
+                  yn = dx * (iy + 0.5);
+                  yp = yn - dt * velocity.m_y;
+                  iyp = floor(yp/dx - 0.5);
+
+                  zn = dx * (iz + 0.5);
+                  zp = zn - dt * velocity.m_z;
+                  izp = floor(zp/dx - 0.5);
+
+                  for(i=0;i<2;i++)
+                    for(j=0;j<2;j++)
+                      for(k=0;k<2;k++){
+                          if(ixp+i>=xSimSize || iyp+j>=ySimSize || izp+k>=zSimSize) // outside the simulation volume, there is a constant value for the quantity
+                            cNew[x][y][z] += outsideValues[k];
+                          cNew[x][y][z]+=(i?ax:(1-ax))*(j?ay:(1-ay))*(k?(1-az):az)*c[ixp+i][iyp+j][izp+k];
+                        }
+                }
+        }
+      else{
+
+          ngl::Vec3 uVelocity, vVelocity, wVelocity;
+          size_t xSize,ySize,zSize;
+
+          xSize = c.size();
+          ySize = c[0].size();
+          zSize = c[0][0].size();
+
+          for(ix=0;ix<xSize;ix++)
+            for(iy=0;iy<ySize;iy++)
+              for(iz=0;iz<zSize;iz++){
+
+                  // don't need interpolation for xp, yp, zp, since they are at grid cell edges, just like the velocities
+
+                  // the current grid wall (of indices (ix,iy,iz)) is viewed as a particle; the wall plane depends on the current data grid
+                  // (xn,yn,zn) is the corresponding position of this particle; (xp,yp,zp) is its projected past position a time dt ago
+                  // we use Forward Euler (might update to RK2)
+                  // (ixp,iyp,izp) are the indices of the grid wall (xpFloor,ypFloor,zpFloor) such that xp is in [xpFloor, xpFloor+dx), yp is in [ypFloor, ypFloor+dx), zp is in [zpFloor, zpFloor+dx)
+                  xn = dx * ix;
+                  xp = xn - dt * u[x][y][z];
+                  ixp = floor(xp/dx);
+
+                  yn = dx * iy;
+                  yp = yn - dt * v[x][y][z];
+                  iyp = floor(yp/dx);
+
+                  zn = dx * iz;
+                  zp = zn - dt * w[x][y][z];
+                  izp = floor(zp/dx);
+
+                  for(i=0;i<2;i++)
+                    for(j=0;j<2;j++)
+                      for(k=0;k<2;k++){
+                          if(ixp+i>=xSize || iyp+j>=ySize || izp+k>=zSize) // outside the simulation volume, there is a constant value for the quantity
+                            cNew[x][y][z] += outsideValues[k];
+                          cNew[x][y][z]+=(i?ax:(1-ax))*(j?ay:(1-ay))*(k?(1-az):az)*c[ixp+i][iyp+j][izp+k];
+                        }
+
+                }
+
+
+        }
+    }
+}
+
+void OpenGLWindow::project()
+{
+
+}
 
 void  OpenGLWindow::makeCubes( GLfloat _size)
 {
@@ -59,21 +178,24 @@ void  OpenGLWindow::makeCubes( GLfloat _size)
   //p = new GLfloat[xSimSize][ySimSize][zSimSize];
 
   p.resize(xSimSize);
+  tm.resize(xSimSize);
   u.resize(xSimSize+1);
   v.resize(xSimSize);
   w.resize(xSimSize);
 
   for(int i=0;i<xSimSize;i++){
-    p[i].resize(ySimSize);
-    u[i].resize(ySimSize);
-    v[i].resize(ySimSize+1);
-    w[i].resize(ySimSize);
-    for(int j=0;j<ySimSize;j++){
-      p[i][j].resize(zSimSize);
-      u[i][j].resize(zSimSize);
-      v[i][j].resize(zSimSize);
-      w[i][j].resize(zSimSize+1);}
-  }
+      p[i].resize(ySimSize);
+      tm[i].resize(ySimSize);
+      u[i].resize(ySimSize);
+      v[i].resize(ySimSize+1);
+      w[i].resize(ySimSize);
+      for(int j=0;j<ySimSize;j++){
+          p[i][j].resize(zSimSize);
+          tm[i][j].resize(zSimSize);
+          u[i][j].resize(zSimSize);
+          v[i][j].resize(zSimSize);
+          w[i][j].resize(zSimSize+1);}
+    }
 
   for(int i=0;i<xSimSize;i++){
       v[i][ySimSize].resize(zSimSize);
@@ -144,42 +266,42 @@ void  OpenGLWindow::makeCubes( GLfloat _size)
     for(size_t d2=0;d2<ySimSize;d2++)
       for(size_t d3=0;d3<zSimSize;d3++)
         for(size_t i=0;i<verts.size();i+=3){
-          //figure out what the normals will be
+            //figure out what the normals will be
 
-          xCoeff=false;
-          yCoeff=false;
-          zCoeff=false;
+            xCoeff=false;
+            yCoeff=false;
+            zCoeff=false;
 
-          if(verts[i].m_x==verts[i+1].m_x&&verts[i+1].m_x==verts[i+2].m_x)
-            xCoeff = true;
-          else if(verts[i].m_y==verts[i+1].m_y&&verts[i+1].m_y==verts[i+2].m_y)
-            yCoeff = true;
-          else if(verts[i].m_z==verts[i+1].m_z&&verts[i+1].m_z==verts[i+2].m_z)
-            zCoeff = true;
+            if(verts[i].m_x==verts[i+1].m_x&&verts[i+1].m_x==verts[i+2].m_x)
+              xCoeff = true;
+            else if(verts[i].m_y==verts[i+1].m_y&&verts[i+1].m_y==verts[i+2].m_y)
+              yCoeff = true;
+            else if(verts[i].m_z==verts[i+1].m_z&&verts[i+1].m_z==verts[i+2].m_z)
+              zCoeff = true;
 
-          //add vertices in three by three, because each vertex in a tri has the same normal vector
+            //add vertices in three by three, because each vertex in a tri has the same normal vector
 
-          for(int t=0;t<3;t++){
-            //vertex position
-            vertexData[++k]=(verts[i+t].m_x+d1*1 - xSimSize/2.0)*_size;
-            vertexData[++k]=(verts[i+t].m_y+d2*1 - ySimSize/2.0)*_size;
-            vertexData[++k]=(verts[i+t].m_z+d3*1 - zSimSize/2.0)*_size;
+            for(int t=0;t<3;t++){
+                //vertex position
+                vertexData[++k]=(verts[i+t].m_x+d1*1 - xSimSize/2.0)*_size;
+                vertexData[++k]=(verts[i+t].m_y+d2*1 - ySimSize/2.0)*_size;
+                vertexData[++k]=(verts[i+t].m_z+d3*1 - zSimSize/2.0)*_size;
 
-            //vertex normal; factor of two because each quad center is 0.5 away from cube origin
-            vertexData[++k]=verts[i+t].m_x * 2 * xCoeff;
-            vertexData[++k]=verts[i+t].m_y * 2 * yCoeff;
-            vertexData[++k]=verts[i+t].m_z * 2 * zCoeff;
+                //vertex normal; factor of two because each quad center is 0.5 away from cube origin
+                vertexData[++k]=verts[i+t].m_x * 2 * xCoeff;
+                vertexData[++k]=verts[i+t].m_y * 2 * yCoeff;
+                vertexData[++k]=verts[i+t].m_z * 2 * zCoeff;
 
-            //vertex color
-            vertexData[++k]=0.5 + d1*0.5/xSimSize;// + verts[i+t].m_x;
-            vertexData[++k]=0.5 + d2*0.5/ySimSize;// + verts[i+t].m_y;
-            vertexData[++k]=0.5 + d3*0.5/zSimSize;// + verts[i+t].m_z;
+                //vertex color
+                vertexData[++k]=0.5 + d1*0.5/xSimSize;// + verts[i+t].m_x;
+                vertexData[++k]=0.5 + d2*0.5/ySimSize;// + verts[i+t].m_y;
+                vertexData[++k]=0.5 + d3*0.5/zSimSize;// + verts[i+t].m_z;
 
-            std::cout<<vertexData[k]<<"\n";
+                std::cout<<vertexData[k]<<"\n";
 
               }
 
-    }
+          }
 
   // now we will create our VBO first we need to ask GL for an Object ID
 
@@ -198,8 +320,8 @@ void  OpenGLWindow::makeCubes( GLfloat _size)
   glBufferData(GL_ARRAY_BUFFER, m_vboSize*sizeof(GL_FLOAT) , vertexData.get(), GL_DYNAMIC_DRAW);
 
   if(m_spin == true){
-    startTimer(100);
-    timer.start();}
+      startTimer(100);
+      timer.start();}
 
 }
 
@@ -223,9 +345,9 @@ void OpenGLWindow::paintGL()
   glColorPointer(3,GL_FLOAT,9*sizeof(GL_FLOAT),(void*)(6*sizeof(GL_FLOAT)));
 
   glPushMatrix();
-    glRotatef(360.0* (m_spin?(timer.elapsed()/5000.0):1),0.0,1.0,0.0);  //* timer.elapsed()/5000
-    glRotatef(45.0,-0.4,1.0,0.0);
-    glDrawArrays(GL_TRIANGLES, 0, xSimSize*ySimSize*zSimSize*m_cubeSubVBOSize*10);
+  glRotatef(360.0* (m_spin?(timer.elapsed()/5000.0):1),0.0,1.0,0.0);  //* timer.elapsed()/5000
+  glRotatef(45.0,-0.4,1.0,0.0);
+  glDrawArrays(GL_TRIANGLES, 0, xSimSize*ySimSize*zSimSize*m_cubeSubVBOSize*10);
   glPopMatrix();
   // now turn off the VBO client state as we have finished with it
   glDisableClientState(GL_NORMAL_ARRAY);
