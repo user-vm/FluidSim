@@ -10,6 +10,7 @@
 #include <iostream>
 #include <ngl/Vec3.h>
 #include <QElapsedTimer>
+#include <cmath>
 
 constexpr float cubeSize=0.05;
 
@@ -26,10 +27,114 @@ OpenGLWindow::~OpenGLWindow()
   glDeleteBuffers(1,&m_vboPointer);
 }
 
+void OpenGLWindow::addPressureFrameData(){
 
+}
+
+void OpenGLWindow::addPressureFrameData(){
+
+}
 
 void OpenGLWindow::initializeGL()
 {
+  simTime = 0.0;
+  size_t k=0;
+  std::vector<std::vector<void*>> args = {{&w[0],&v[0],&u[0],&p[0]},{&w[1],&v[1],&u[1],&p[1]}};
+  std::vector<bool> isCentered = {true, true, true, false};
+  std::vector<float> outsideValues = {0,0,0,0}; // take outside velocity to be 0 for now (smoke-like)
+  std::vector<std::vector<std::vector<float>>> z;
+
+  z.resize(xSimSize);
+
+  for(int i;i<xSimSize;i++){
+      z.resize(ySimSize);
+      for(int j;j<ySimSize;j++)
+        z.resize(zSimSize);
+    }
+
+  for(int o;o<2;o++){
+
+      //the simulation uses a staggered MAC grid
+      //the p values are at the center of the grid cells (p[i][j][k] = p_i,j,k)
+
+      p[o].resize(xSimSize);
+      //tm[o].resize(xSimSize);
+      u[o].resize(xSimSize+1);
+      v[o].resize(xSimSize);
+      w[o].resize(xSimSize);
+
+      for(int i=0;i<xSimSize;i++){
+          p[o][i].resize(ySimSize);
+          //tm[i].resize(ySimSize);
+          u[o][i].resize(ySimSize);
+          v[o][i].resize(ySimSize+1);
+          w[o][i].resize(ySimSize);
+          for(int j=0;j<ySimSize;j++){
+              p[o][i][j].resize(zSimSize);
+              //tm[i][j].resize(zSimSize);
+              u[o][i][j].resize(zSimSize);
+              v[o][i][j].resize(zSimSize);
+              w[o][i][j].resize(zSimSize+1);}
+        }
+
+      for(int i=0;i<xSimSize;i++){
+          v[o][i][ySimSize].resize(zSimSize);
+        }
+
+      u[o][xSimSize].resize(zSimSize);
+      for(int j=0;j<ySimSize;j++)
+        u[o][xSimSize][j].resize(zSimSize);
+    }
+
+  size_t xSize = u[0].size();
+  size_t ySize = u[0][0].size();
+  size_t zSize = u[0][0][0].size();
+
+  // prepare A matrix; since walls are not implemented yet, all diag values will be 6, and all other values will be -1, except at the (xSimSize-1, ySimSize-1, zSimSize-1) corner
+
+  for(int ai=0;ai<xSimSize;ai++)
+    for(int aj=0;aj<ySimSize;aj++)
+      for(int ak=0;ak<zSimSize;ak++){
+
+        A[ai][aj][ak].diag = 6;
+
+        if(i<xSimSize-1)
+          A[ai][aj][ak].iUp = -1;
+        else
+          A[ai][aj][ak].iUp = 0;
+
+        if(j<ySimSize-1)
+          A[ai][aj][ak].jUp = -1;
+        else
+          A[ai][aj][ak].jUp = 0;
+
+        if(k<zSimSize-1)
+          A[ai][aj][ak].kUp = -1;
+        else
+          A[ai][aj][ak].kUp = 0;
+
+        }
+
+  while(simTime<=totalSimTime-dt){
+
+      // only need information for two consectutive time steps; which of args[0] and args[1] is the current timestep will cycle as we move forward
+      // NO, ADVECT RUNS WITH [0] AS OLD, BODY REWRITES [1], PROJECT RUNS WITH [1] AS OLD, REPEAT
+      advect(args[k%2],args[(k+1)%2],isCentered,outsideValues);
+
+      for(i=0;i<xSize;i++)
+        for(j=0;j<ySize;j++)
+          for(k=0;k<zSize;k++)
+
+            u[1][i][j][k] += g * dt;
+
+      project(z);}
+      simTime += dt;
+
+      if(fmod(simTime,dt) >= currentFrame){
+          addPressureFrameData();
+          addVelocityFrameData();
+    }
+
   glewInit();
 
   glClearColor(0.5f, 0.5f, 0.5f, 1.0f);			   // Grey Background
@@ -40,50 +145,79 @@ void OpenGLWindow::initializeGL()
   makeCubes(cubeSize);
 }
 
-bool OpenGLWindow::advect(){
-  std::vector args;
-  std::vector<bool> isCentered;
-  return advect(args, isCentered);
+void OpenGLWindow::project(std::vector<std::vector<std::vector<float>>> z)
+{
+  bool breakIteration = true; // flag for whether the result is within tolerance
+
+  for(size_t i=0;i<xSimSize;i++)
+    for(size_t j=0;j<ySimSize;j++)
+      for(size_t k=0;k<zSimSize;k++){
+
+        d[i][j][k] = (u[i][j][k] - u[i+1][j][k] + v[i][j][k] - v[i][j+1][k] + w[i][j][k] - w[i][j][k+1])/2;
+        if(abs(r[i][j][k] = d[i][j][k])>tol)
+          breakIteration = false;
+        p[0][i][j][k] = 0;
+  }
+
+  if(breakIteration)
+    return;
+
+  for(it=0;it<maxIterations;it++){
+
+      for(size_t i=0;i<xSimSize;i++)
+        for(size_t j=0;j<ySimSize;j++)
+          for(size_t k=0;k<zSimSize;k++){
+
+            // apply preconditioner (is the i,j or k = 0 limit behaviour correct?)
+            e = A[i][j][k].diag;
+            if(i>0)
+              e-= pow((A[i-1][j][k].iUp * r[i-1][j][k]),2) + tau * (A[i-1][j][k].iUp * (A[i-1][j][k].jUp + A[i-1][j][k].kUp)) * pow(precon[i-1][j][k],2);
+            if(j>0)
+              e-= pow((A[i][j-1][k].jUp * r[i][j-1][k]),2) + tau * (A[i][j-1][k].jUp * (A[i][j-1][k].iUp + A[i][j-1][k].kUp)) * pow(precon[i][j-1][k],2);
+            if(k>0)
+              e-= pow((A[i][j][k-1].iUp * r[i][j][k-1]),2) + tau * (A[i][j][k-1].iUp * (A[i][j][k-1].jUp + A[i][j][k-1].kUp)) * pow(precon[i][j][k-1],2);
+
+            precon[i][j][k] = 1.0/sqrt(e+1E-30);
+            }
+
+
+    }
 }
 
-bool OpenGLWindow::advect(std::vector args, std::vector<bool> isCentered, std::vector<float> outsideValues)
+bool OpenGLWindow::advect(std::vector args, std::vector newArgs, std::vector<bool> isCentered, std::vector<float> outsideValues)
 {
+  int oldIndex = 0;
+  int newIndex = 1;
+
   // if args is empty, assume only u,v,w and p need to be updated
-  if(args.size()==0){
-      isCentered.clear();
 
-      args.push_back(w);
-      args.push_back(false);
-
-      args.push_back(v);
-      args.push_back(false);
-
-      args.push_back(u);
-      args.push_back(false);
-
-      args.push_back(p);
-      args.push_back(true);
+  if(args.size() != isCentered.size()){
+      std::cout<<"args and isCentered mismatch";
+      return false;
     }
-  else
-    if(args.size() != isCentered.size()){
-        std::cout<<"args and isCentered mismatch";
-        return false;
-      }
+  if(newArgs.size() != isCentered.size()){
+      std::cout<<"newArgs and isCentered mismatch";
+      return false;
+    }
   int k=0;
   for(auto c:args){
 
-      if(isCentered[k++]==0){
+      std::vector cNew = newArgs[k++];
+
+      if(isCentered[k]==0){
 
           ngl::Vec3 velocity;
+          float xn, xp, yn, yp, zn, zp, ax, ay, az;
+          int ixp, iyp, izp;
 
-          for(ix=0;ix<xSimSize;ix++)
-            for(iy=0;iy<ySimSize;iy++)
-              for(iz=0;iz<zSimSize;iz++){
+          for(int ix=0;ix<xSimSize;ix++)
+            for(int iy=0;iy<ySimSize;iy++)
+              for(int iz=0;iz<zSimSize;iz++){
 
                   // get velocity components at center of current grid cell through trilinear interpolation
-                  velocity.m_x = (u[ix][iy][iz]+u[ix+1][iy][iz])/2;
-                  velocity.m_y = (v[ix][iy][iz]+v[ix][iy+1][iz])/2;
-                  velocity.m_z = (w[ix][iy][iz]+w[ix][iy][iz+1])/2;
+                  velocity.m_x = (u[oldIndex][ix][iy][iz]+u[oldIndex][ix+1][iy][iz])/2;
+                  velocity.m_y = (v[oldIndex][ix][iy][iz]+v[oldIndex][ix][iy+1][iz])/2;
+                  velocity.m_z = (w[oldIndex][ix][iy][iz]+w[oldIndex][ix][iy][iz+1])/2;
 
                   // the current grid cell (of indices (ix,iy,iz)) is viewed as a particle
                   // (xn,yn,zn) is the corresponding position of this particle; (xp,yp,zp) is its projected past position a time dt ago
@@ -92,36 +226,41 @@ bool OpenGLWindow::advect(std::vector args, std::vector<bool> isCentered, std::v
                   xn = dx * (ix + 0.5);
                   xp = xn - dt * velocity.m_x;
                   ixp = floor(xp/dx - 0.5);
+                  ax = dx * (ixp + 0.5);
 
                   yn = dx * (iy + 0.5);
                   yp = yn - dt * velocity.m_y;
                   iyp = floor(yp/dx - 0.5);
+                  ay = dx * (iyp + 0.5);
 
                   zn = dx * (iz + 0.5);
                   zp = zn - dt * velocity.m_z;
                   izp = floor(zp/dx - 0.5);
+                  az = dx * (izp + 0.5);
 
-                  for(i=0;i<2;i++)
-                    for(j=0;j<2;j++)
-                      for(k=0;k<2;k++){
-                          if(ixp+i>=xSimSize || iyp+j>=ySimSize || izp+k>=zSimSize) // outside the simulation volume, there is a constant value for the quantity
-                            cNew[x][y][z] += outsideValues[k];
-                          cNew[x][y][z]+=(i?ax:(1-ax))*(j?ay:(1-ay))*(k?(1-az):az)*c[ixp+i][iyp+j][izp+k];
+                  for(int i=0;i<2;i++)
+                    for(int j=0;j<2;j++)
+                      for(int k=0;k<2;k++){
+                          if(ixp+i>=xSimSize || iyp+j>=ySimSize || izp+k>=zSimSize){ // outside the simulation volume, there is a constant value for the quantity
+                            c[newIndex][x][y][z] += outsideValues[k];
+                            continue;}
+                          c[newIndex][x][y][z]+=(i?ax:(1-ax))*(j?ay:(1-ay))*(k?(1-az):az)*c[ixp+i][iyp+j][izp+k];
                         }
                 }
         }
       else{
 
-          ngl::Vec3 uVelocity, vVelocity, wVelocity;
           size_t xSize,ySize,zSize;
+          float xn, xp, yn, yp, zn, zp, ax, ay, az;
+          int ixp, iyp, izp;
 
-          xSize = c.size();
-          ySize = c[0].size();
+          xSize = c[oldIndex].size();
+          ySize = c[oldIndex][0].size();
           zSize = c[0][0].size();
 
-          for(ix=0;ix<xSize;ix++)
-            for(iy=0;iy<ySize;iy++)
-              for(iz=0;iz<zSize;iz++){
+          for(size_t ix=0;ix<xSize;ix++)
+            for(size_t iy=0;iy<ySize;iy++)
+              for(size_t iz=0;iz<zSize;iz++){
 
                   // don't need interpolation for xp, yp, zp, since they are at grid cell edges, just like the velocities
 
@@ -130,35 +269,33 @@ bool OpenGLWindow::advect(std::vector args, std::vector<bool> isCentered, std::v
                   // we use Forward Euler (might update to RK2)
                   // (ixp,iyp,izp) are the indices of the grid wall (xpFloor,ypFloor,zpFloor) such that xp is in [xpFloor, xpFloor+dx), yp is in [ypFloor, ypFloor+dx), zp is in [zpFloor, zpFloor+dx)
                   xn = dx * ix;
-                  xp = xn - dt * u[x][y][z];
+                  xp = xn - dt * u[oldIndex][x][y][z];
                   ixp = floor(xp/dx);
+                  ax = dx * ixp;
 
                   yn = dx * iy;
-                  yp = yn - dt * v[x][y][z];
+                  yp = yn - dt * v[oldIndex][x][y][z];
                   iyp = floor(yp/dx);
+                  ay = dx * iyp;
 
                   zn = dx * iz;
-                  zp = zn - dt * w[x][y][z];
+                  zp = zn - dt * w[oldIndex][x][y][z];
                   izp = floor(zp/dx);
+                  az = dx * izp;
 
                   for(i=0;i<2;i++)
                     for(j=0;j<2;j++)
                       for(k=0;k<2;k++){
-                          if(ixp+i>=xSize || iyp+j>=ySize || izp+k>=zSize) // outside the simulation volume, there is a constant value for the quantity
-                            cNew[x][y][z] += outsideValues[k];
-                          cNew[x][y][z]+=(i?ax:(1-ax))*(j?ay:(1-ay))*(k?(1-az):az)*c[ixp+i][iyp+j][izp+k];
+                          if(ixp+i>=xSize || iyp+j>=ySize || izp+k>=zSize){ // outside the simulation volume, there is a constant value for the quantity
+                            c[newIndex][x][y][z] += outsideValues[k];
+                            continue;}
+                          c[newIndex][x][y][z]+=(i?ax:(1-ax))*(j?ay:(1-ay))*(k?(1-az):az)*c[ixp+i][iyp+j][izp+k];
                         }
 
                 }
 
-
         }
     }
-}
-
-void OpenGLWindow::project()
-{
-
 }
 
 void  OpenGLWindow::makeCubes( GLfloat _size)
@@ -172,43 +309,6 @@ void  OpenGLWindow::makeCubes( GLfloat _size)
   m_vboSize= m_cubeSubVBOSize*xSimSize*ySimSize*zSimSize*3;
 
   std::unique_ptr<GLfloat []>vertexData( new GLfloat[m_vboSize]);
-
-  //the simulation uses a staggered MAC grid
-  //the p values are at the center of the grid cells (p[i][j][k] = p_i,j,k)
-  //p = new GLfloat[xSimSize][ySimSize][zSimSize];
-
-  p.resize(xSimSize);
-  tm.resize(xSimSize);
-  u.resize(xSimSize+1);
-  v.resize(xSimSize);
-  w.resize(xSimSize);
-
-  for(int i=0;i<xSimSize;i++){
-      p[i].resize(ySimSize);
-      tm[i].resize(ySimSize);
-      u[i].resize(ySimSize);
-      v[i].resize(ySimSize+1);
-      w[i].resize(ySimSize);
-      for(int j=0;j<ySimSize;j++){
-          p[i][j].resize(zSimSize);
-          tm[i][j].resize(zSimSize);
-          u[i][j].resize(zSimSize);
-          v[i][j].resize(zSimSize);
-          w[i][j].resize(zSimSize+1);}
-    }
-
-  for(int i=0;i<xSimSize;i++){
-      v[i][ySimSize].resize(zSimSize);
-    }
-
-  u[xSimSize].resize(zSimSize);
-  for(int j=0;j<ySimSize;j++)
-    u[xSimSize][j].resize(zSimSize);
-
-  //the u,v,w values are at the centers of the faces that delimit cells (u[i][j][k] = u_i-1/2,j,k; v[i][j][k] = v_i,j-1/2,k; w[i][j][k] = w_i,j,k-1/2)
-  //u = new float[xSimSize+1][ySimSize][zSimSize];
-  //v = new float[xSimSize][ySimSize+1][zSimSize];
-  //w = new float[xSimSize][ySimSize][zSimSize+1];
 
   std::vector<ngl::Vec3> verts=
   {
@@ -319,9 +419,8 @@ void  OpenGLWindow::makeCubes( GLfloat _size)
   // Then how we are going to draw it (in this case Statically as the data will not change)
   glBufferData(GL_ARRAY_BUFFER, m_vboSize*sizeof(GL_FLOAT) , vertexData.get(), GL_DYNAMIC_DRAW);
 
-  if(m_spin == true){
-      startTimer(100);
-      timer.start();}
+  startTimer(100);
+  timer.start();
 
 }
 

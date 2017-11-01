@@ -57,9 +57,12 @@ class OpenGLWindow : public QOpenGLWindow
     /// @param[in] args vector of pointers to the data grids to update (velocity component, pressure, temperature, etc.)
     /// @param[in] isCentered vector of bools, true if corresponding grid data is stored at cell centers (pressure-like) or
     /// at faces (velocity-like); must have length equal to args
+    /// @param[in] outsideValues the values of corresponding args quantities outside the simulation volume
+    /// @param[in] oldIndex true if we use args[i][1] to compute args[i][0], false if it's the other way around
+    /// @param[out] args updated with new quantity values
     /// @returns true on success, false on failure (if args and isCentered don't match)
     //----------------------------------------------------------------------------------------------------------------------
-    bool advect(std::vector args, std::vector<bool> isCentered);
+    bool advect(std::vector<void*> args, std::vector<void*> newArgs, std::vector<bool> isCentered, std::vector<float>outsideValues);
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief advection function (alternate constructor); takes args to contain u,v,w and p
     /// @returns true
@@ -109,15 +112,15 @@ class OpenGLWindow : public QOpenGLWindow
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief the 3d pressure grid values
     //----------------------------------------------------------------------------------------------------------------------
-    std::vector<std::vector<std::vector<float>>> p;
+    std::vector<std::vector<std::vector<std::vector<float>>>> p;
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief the u, v and w velocities (along x, y and z axes, respectively
     //----------------------------------------------------------------------------------------------------------------------
-    std::vector<std::vector<std::vector<float>>> u, v, w;
+    std::vector<std::vector<std::vector<std::vector<float>>>> u, v, w;
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief the grid temperatures (for smoke simulation)
     //----------------------------------------------------------------------------------------------------------------------
-    std::vector<std::vector<std::vector<float>>> tm;
+    std::vector<std::vector<std::vector<std::vector<float>>>> tm;
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief the timestep
     //----------------------------------------------------------------------------------------------------------------------
@@ -126,6 +129,50 @@ class OpenGLWindow : public QOpenGLWindow
     /// @brief the frame duration (1/framerate)
     //----------------------------------------------------------------------------------------------------------------------
     float frameDuration;
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief the current simulation time
+    //----------------------------------------------------------------------------------------------------------------------
+    float simTime=0.0;
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief the total time to simulate
+    //----------------------------------------------------------------------------------------------------------------------
+    float totalSimTime=0.0;
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief the default gravitational acceleration
+    //----------------------------------------------------------------------------------------------------------------------
+    float g = -9.81;
+
+    // now project() stuff
+
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief the class defining the elements of the coefficient matrix for use in the projection function
+    //----------------------------------------------------------------------------------------------------------------------
+    class SevenPointLagrangianMatrixElement{
+      float diag; // A(i,j,k)(i,j,k)
+      float iUp;  // A(i,j,k)(i+1,j,k)
+      float jUp;  // A(i,j,k)(i,j+1,k)
+      float kUp;  // A(i,j,k)(i,j,k+1)
+    };
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief the coefficient matrix for use in the projection function
+    //----------------------------------------------------------------------------------------------------------------------
+    std::vector<std::vector<std:vector<SevenPointLagrangianMatrixElement>>> A;
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief the matrix of velocity divergence
+    //----------------------------------------------------------------------------------------------------------------------
+    std::vector<std::vector<std::vector<float>>> d;
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief the tolerance for the maximum residual vector element in the projection function
+    //----------------------------------------------------------------------------------------------------------------------
+    float tol=1E-6;
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief the maximum number of iterations in the projection function
+    //----------------------------------------------------------------------------------------------------------------------
+    size_t maxIterations=100;
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief the tuning constant for Modified Incomplete Cholesky (in project())
+    //----------------------------------------------------------------------------------------------------------------------
+
   };
 
   #endif
