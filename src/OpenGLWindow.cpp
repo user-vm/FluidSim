@@ -31,64 +31,81 @@ void OpenGLWindow::addPressureFrameData(){
 
 }
 
-void OpenGLWindow::addPressureFrameData(){
+void OpenGLWindow::addVelocityFrameData(){
 
 }
 
-void OpenGLWindow::initializeGL()
-{
+void OpenGLWindow::initializePressure(std::vector<std::vector<std::vector<float>>> pInitial){
+
+  // here we will populate the pressure grid with its initial values
+  // nothing here at the moment, so grid will be all zeroes
+}
+
+void OpenGLWindow::initializeVelocity(std::vector<std::vector<std::vector<float>>> uInitial, std::vector<std::vector<std::vector<float>>> vInitial, std::vector<std::vector<std::vector<float>>> wInitial){
+
+  // here we will populate the velocity grids with their initial values
+  // nothing here at the moment, so grids will be all zeroes
+}
+
+void OpenGLWindow::bake(){
+
+  dx = cubeSize;
+
   simTime = 0.0;
   size_t k=0;
-  std::vector<std::vector<void*>> args = {{&w[0],&v[0],&u[0],&p[0]},{&w[1],&v[1],&u[1],&p[1]}};
+  std::vector<std::vector<std::vector<std::vector<std::vector<float>>>>> args = {w,v,u,p};
   std::vector<bool> isCentered = {true, true, true, false};
   std::vector<float> outsideValues = {0,0,0,0}; // take outside velocity to be 0 for now (smoke-like)
-  std::vector<std::vector<std::vector<float>>> z;
+  std::vector<std::vector<std::vector<SevenPointLagrangianMatrixElement>>> A;
 
-  z.resize(xSimSize);
+  std::vector<std::vector<std::vector<float>>> r, z, s, d, precon, q;
 
-  for(int i;i<xSimSize;i++){
-      z.resize(ySimSize);
-      for(int j;j<ySimSize;j++)
-        z.resize(zSimSize);
+  addPressureFrameData();
+  addVelocityFrameData();
+  size_t currentFrame = 0;
+
+  // build all the grid matrices
+
+  p.resize(2);
+  u.resize(2);
+  v.resize(2);
+  w.resize(2);
+
+  std::vector<std::vector<std::vector<std::vector<float>>>> centeredVarVect = {r,s,z,d,precon,q,p[0]};
+
+  u.resize(xSimSize+1);
+  v.resize(xSimSize);
+  w.resize(xSimSize);
+
+  for(int i=0;i<xSimSize;i++){
+      for(auto q1: centeredVarVect)
+        q1.resize(ySimSize);
+      u[0][i].resize(ySimSize);
+      v[0][i].resize(ySimSize+1);
+      w[0][i].resize(ySimSize);
+      for(int j=0;j<ySimSize;j++){
+          for(auto q : centeredVarVect)
+            q[i][j].resize(zSimSize);
+
+          u[0][i][j].resize(zSimSize);
+          v[0][i][j].resize(zSimSize);
+          w[0][i][j].resize(zSimSize+1);
+
+        }
+      v[ySimSize].resize(zSimSize);
     }
 
-  for(int o;o<2;o++){
+  for(int j=0;j<ySimSize;j++)
+    u[0][xSimSize][j].resize(zSimSize);
 
-      //the simulation uses a staggered MAC grid
-      //the p values are at the center of the grid cells (p[i][j][k] = p_i,j,k)
+  u[1] = u[0];
+  v[1] = v[0];
+  w[1] = w[0];
 
-      p[o].resize(xSimSize);
-      //tm[o].resize(xSimSize);
-      u[o].resize(xSimSize+1);
-      v[o].resize(xSimSize);
-      w[o].resize(xSimSize);
+  p[1] = p[0];
 
-      for(int i=0;i<xSimSize;i++){
-          p[o][i].resize(ySimSize);
-          //tm[i].resize(ySimSize);
-          u[o][i].resize(ySimSize);
-          v[o][i].resize(ySimSize+1);
-          w[o][i].resize(ySimSize);
-          for(int j=0;j<ySimSize;j++){
-              p[o][i][j].resize(zSimSize);
-              //tm[i][j].resize(zSimSize);
-              u[o][i][j].resize(zSimSize);
-              v[o][i][j].resize(zSimSize);
-              w[o][i][j].resize(zSimSize+1);}
-        }
-
-      for(int i=0;i<xSimSize;i++){
-          v[o][i][ySimSize].resize(zSimSize);
-        }
-
-      u[o][xSimSize].resize(zSimSize);
-      for(int j=0;j<ySimSize;j++)
-        u[o][xSimSize][j].resize(zSimSize);
-    }
-
-  size_t xSize = u[0].size();
-  size_t ySize = u[0][0].size();
-  size_t zSize = u[0][0][0].size();
+  initializePressure(p[0]);
+  initializeVelocity(u[0],v[0],w[0]);
 
   // prepare A matrix; since walls are not implemented yet, all diag values will be 6, and all other values will be -1, except at the (xSimSize-1, ySimSize-1, zSimSize-1) corner
 
@@ -96,44 +113,66 @@ void OpenGLWindow::initializeGL()
     for(int aj=0;aj<ySimSize;aj++)
       for(int ak=0;ak<zSimSize;ak++){
 
-        A[ai][aj][ak].diag = 6;
+          A[ai][aj][ak].diag = 6;
 
-        if(i<xSimSize-1)
-          A[ai][aj][ak].iUp = -1;
-        else
-          A[ai][aj][ak].iUp = 0;
+          if(ai<xSimSize-1)
+            A[ai][aj][ak].iUp = -1;
+          else
+            A[ai][aj][ak].iUp = 0;
 
-        if(j<ySimSize-1)
-          A[ai][aj][ak].jUp = -1;
-        else
-          A[ai][aj][ak].jUp = 0;
+          if(aj<ySimSize-1)
+            A[ai][aj][ak].jUp = -1;
+          else
+            A[ai][aj][ak].jUp = 0;
 
-        if(k<zSimSize-1)
-          A[ai][aj][ak].kUp = -1;
-        else
-          A[ai][aj][ak].kUp = 0;
+          if(ak<zSimSize-1)
+            A[ai][aj][ak].kUp = -1;
+          else
+            A[ai][aj][ak].kUp = 0;
 
         }
 
   while(simTime<=totalSimTime-dt){
 
-      // only need information for two consectutive time steps; which of args[0] and args[1] is the current timestep will cycle as we move forward
-      // NO, ADVECT RUNS WITH [0] AS OLD, BODY REWRITES [1], PROJECT RUNS WITH [1] AS OLD, REPEAT
-      advect(args[k%2],args[(k+1)%2],isCentered,outsideValues);
+      // only need information for two consectutive time steps
+      // ADVECT RUNS WITH [0] AS OLD, BODY REWRITES [1], PROJECT RUNS WITH [1] AS OLD, REPEAT
+      advect(args,isCentered,outsideValues);
 
-      for(i=0;i<xSize;i++)
-        for(j=0;j<ySize;j++)
-          for(k=0;k<zSize;k++)
+      // body function is just updating the velocities to account for gravity
+      for(int i=0;i<=xSimSize;i++)
+        for(int j=0;j<=ySimSize;j++)
+          for(int k=0;k<=zSimSize;k++){
 
-            u[1][i][j][k] += g * dt;
+            if(i==xSimSize){
+              u[1][i][j][k] += g.m_x * dt;
+              continue;}
+            else
+              if(j==ySimSize){
+                v[1][i][j][k] += g.m_y * dt;
+                continue;}
+              else
+                if(k==zSimSize){
+                    w[1][i][j][k] += g.m_z * dt;
+                    continue;}
 
-      project(z);}
+            u[1][i][j][k] += g.m_x * dt;
+            v[1][i][j][k] += g.m_y * dt;
+            w[1][i][j][k] == g.m_z * dt;
+            }
+
+      project(A,z,d,r,s,precon,q);
       simTime += dt;
 
       if(fmod(simTime,dt) >= currentFrame){
           addPressureFrameData();
           addVelocityFrameData();
+          currentFrame++;
+        }
     }
+}
+
+void OpenGLWindow::initializeGL()
+{
 
   glewInit();
 
@@ -143,66 +182,224 @@ void OpenGLWindow::initializeGL()
   glEnable(GL_MULTISAMPLE);
 
   makeCubes(cubeSize);
+  bake();
 }
 
-void OpenGLWindow::project(std::vector<std::vector<std::vector<float>>> z)
+bool OpenGLWindow::project(std::vector<std::vector<std::vector<SevenPointLagrangianMatrixElement>>> A, std::vector<std::vector<std::vector<float>>> z,
+                           std::vector<std::vector<std::vector<float>>> d, std::vector<std::vector<std::vector<float>>> r,
+                           std::vector<std::vector<std::vector<float>>> s, std::vector<std::vector<std::vector<float>>> precon,
+                           std::vector<std::vector<std::vector<float>>> q)
 {
-  bool breakIteration = true; // flag for whether the result is within tolerance
+  int oldIndex = 1;
+  int newIndex = 0;
+
+  float sigma;
+
+  bool breakIteration = true; // flag for whether the result is within tolerance before looping
 
   for(size_t i=0;i<xSimSize;i++)
     for(size_t j=0;j<ySimSize;j++)
       for(size_t k=0;k<zSimSize;k++){
 
-        d[i][j][k] = (u[i][j][k] - u[i+1][j][k] + v[i][j][k] - v[i][j+1][k] + w[i][j][k] - w[i][j][k+1])/2;
-        if(abs(r[i][j][k] = d[i][j][k])>tol)
+        d[i][j][k] = (u[oldIndex][i][j][k] - u[oldIndex][i+1][j][k] + v[oldIndex][i][j][k] - v[oldIndex][i][j+1][k] + w[oldIndex][i][j][k] - w[oldIndex][i][j][k+1])/2;
+        r[i][j][k] = d[i][j][k];
+        if(abs(r[i][j][k])>tol)
           breakIteration = false;
         p[0][i][j][k] = 0;
   }
 
   if(breakIteration)
-    return;
+    return true;
 
-  for(it=0;it<maxIterations;it++){
+  //first we apply the preconditioner
+  applyPreconditioner(sigma, A, z, d, r, s, precon, q);
 
-      for(size_t i=0;i<xSimSize;i++)
-        for(size_t j=0;j<ySimSize;j++)
-          for(size_t k=0;k<zSimSize;k++){
+  // now loop
 
-            // apply preconditioner (is the i,j or k = 0 limit behaviour correct?)
-            e = A[i][j][k].diag;
-            if(i>0)
-              e-= pow((A[i-1][j][k].iUp * r[i-1][j][k]),2) + tau * (A[i-1][j][k].iUp * (A[i-1][j][k].jUp + A[i-1][j][k].kUp)) * pow(precon[i-1][j][k],2);
-            if(j>0)
-              e-= pow((A[i][j-1][k].jUp * r[i][j-1][k]),2) + tau * (A[i][j-1][k].jUp * (A[i][j-1][k].iUp + A[i][j-1][k].kUp)) * pow(precon[i][j-1][k],2);
-            if(k>0)
-              e-= pow((A[i][j][k-1].iUp * r[i][j][k-1]),2) + tau * (A[i][j][k-1].iUp * (A[i][j][k-1].jUp + A[i][j][k-1].kUp)) * pow(precon[i][j][k-1],2);
+  float maxAbsR, a, b;
 
-            precon[i][j][k] = 1.0/sqrt(e+1E-30);
+  for(int it=0;it<maxIterations;it++){
+
+      maxAbsR = 0;
+
+      applyA(s,z,A);
+      a = rho / dotProduct(z,s);
+
+      for(int i=0;i<xSimSize;i++)
+        for(int j=0;j<ySimSize;j++)
+          for(int k=0;k<zSimSize;k++){
+
+              p[newIndex][i][j][k] += a * s[i][j][k];
+              r[i][j][k] -= a * z[i][j][k];
+
+              if(abs(r[i][j][k]) > maxAbsR)
+                maxAbsR = abs(r[i][j][k]);
             }
 
+      if(maxAbsR <= tol)
+        return true;
+
+      applyPreconditioner(sigma, A, z, d, r, s, precon, q);
+
+      b = sigma / rho;
+
+      for(int i=0;i<xSimSize;i++)
+        for(int j=0;j<ySimSize;j++)
+          for(int k=0;k<zSimSize;k++)
+
+            s[i][j][k] = z[i][j][k] + b * s[i][j][k];
 
     }
+
+  // now compute the new velocities
+
+  //...
+
+  return false;
 }
 
-bool OpenGLWindow::advect(std::vector args, std::vector newArgs, std::vector<bool> isCentered, std::vector<float> outsideValues)
+// applies the preconditioner, also does the dotproduct for sigma, so we don't loop the whole grid again
+// returns true on success, false on failure
+bool OpenGLWindow::applyPreconditioner(float& sigma, std::vector<std::vector<std::vector<SevenPointLagrangianMatrixElement>>> A,
+                                       std::vector<std::vector<std::vector<float>>> z, std::vector<std::vector<std::vector<float>>> d,
+                                       std::vector<std::vector<std::vector<float>>> r, std::vector<std::vector<std::vector<float>>> s,
+                                       std::vector<std::vector<std::vector<float>>> precon, std::vector<std::vector<std::vector<float>>> q){
+
+  float e, t;
+
+  for(size_t i=0;i<xSimSize;i++)
+    for(size_t j=0;j<ySimSize;j++)
+      for(size_t k=0;k<zSimSize;k++){
+
+          //THIS ISN'T GOING TO WORK BECAUSE YOU SET P TO ZERO
+          //if(p[i][j][k] == 0) // if there is no fluid in this cell, skip it
+          //  continue; // need to set stuff to zero? (probably not)
+
+          // apply preconditioner (is the i,j or k = 0 limit behaviour correct?)
+
+          e = A[i][j][k].diag;
+          if(i>0)
+            e-= pow((A[i-1][j][k].iUp * r[i-1][j][k]),2) + tau * (A[i-1][j][k].iUp * (A[i-1][j][k].jUp + A[i-1][j][k].kUp)) * pow(precon[i-1][j][k],2);
+          if(j>0)
+            e-= pow((A[i][j-1][k].jUp * r[i][j-1][k]),2) + tau * (A[i][j-1][k].jUp * (A[i][j-1][k].iUp + A[i][j-1][k].kUp)) * pow(precon[i][j-1][k],2);
+          if(k>0)
+            e-= pow((A[i][j][k-1].iUp * r[i][j][k-1]),2) + tau * (A[i][j][k-1].iUp * (A[i][j][k-1].jUp + A[i][j][k-1].kUp)) * pow(precon[i][j][k-1],2);
+
+          precon[i][j][k] = 1.0/sqrt(e+1E-30);
+
+          t = r[i][j][k];
+          if(i>0)
+            t-= A[i-1][j][k].iUp * precon[i-1][j][k] * q[i-1][j][k];
+          if(j>0)
+            t-= A[i][j-1][k].iUp * precon[i][j-1][k] * q[i][j-1][k];
+          if(k>0)
+            t-= A[i][j][k-1].iUp * precon[i][j][k-1] * q[i][j][k-1];
+
+          q[i][j][k] = t * precon[i][j][k];
+        }
+
+  sigma = 0;
+
+  for(int i=xSimSize-1;i>=0;i--)
+    for(int j=ySimSize-1;j>=0;j--)
+      for(int k=zSimSize-1;k>=0;k--){
+
+          t = q[i][j][k];
+          if(i<xSimSize)
+            t-= A[i][j][k].iUp * precon[i][j][k] * z[i+1][j][k];
+          if(j<ySimSize)
+            t-= A[i][j][k].jUp * precon[i][j][k] * z[i][j+1][k];
+          if(k<zSimSize)
+            t-= A[i][j][k].kUp * precon[i][j][k] * z[i][j][k+1];
+
+          z[i][j][k] = t * precon[i][j][k];
+
+          // s is the search vector
+          s[i][j][k] = z[i][j][k];
+
+          // set sigma as the dot product of z and r
+          sigma += z[i][j][k] * r[i][j][k];
+        }
+}
+
+float OpenGLWindow::dotProduct(std::vector<std::vector<std::vector<float>>> aMatrix, std::vector<std::vector<std::vector<float>>> bMatrix){
+
+  size_t xSize = aMatrix.size();
+  size_t ySize = aMatrix[0].size();
+  size_t zSize = aMatrix[0][0].size();
+
+  if(bMatrix.size() != aMatrix.size() || bMatrix[0].size() != aMatrix[0].size() || bMatrix[0][0].size() != aMatrix[0][0].size())
+    return NAN;
+
+  float d = 0;
+
+  for(int i=0;i<xSize;i++)
+    for(int j=0;j<ySize;j++)
+      for(int k=0;k<zSize;k++)
+
+        d += aMatrix[i][j][k] * bMatrix[i][j][k];
+
+  return d;
+
+}
+
+// returns true on success, false on failure
+bool OpenGLWindow::applyA(std::vector<std::vector<std::vector<float>>> aMatrix, std::vector<std::vector<std::vector<float>>> targetMatrix,
+                          std::vector<std::vector<std::vector<SevenPointLagrangianMatrixElement>>> A){
+
+  size_t xSize = aMatrix.size();
+  size_t ySize = aMatrix[0].size();
+  size_t zSize = aMatrix[0][0].size();
+
+  if(targetMatrix.size() != A.size() || targetMatrix[0].size() != A[0].size() || targetMatrix[0][0].size() != A[0][0].size())
+    return false;
+
+  float d = 0;
+
+  for(int i=0;i<xSize;i++)
+    for(int j=0;j<ySize;j++)
+      for(int k=0;k<zSize;k++){
+
+          targetMatrix[i][j][k] = A[i][j][k].diag * aMatrix[i][j][k];
+
+          if(i<xSimSize)
+            targetMatrix[i][j][k]+= A[i][j][k].iUp * aMatrix[i+1][j][k];
+          if(j<ySimSize)
+            targetMatrix[i][j][k]+= A[i][j][k].jUp * aMatrix[i][j+1][k];
+          if(k<zSimSize)
+            targetMatrix[i][j][k]+= A[i][j][k].kUp * aMatrix[i][j][k+1];
+
+          // A[i][j][k][i-1][j][k] = A[i-1][j][k][i][j][k] (symmetry)
+
+          if(i<xSimSize)
+            targetMatrix[i][j][k]+= A[i-1][j][k].iUp * aMatrix[i-1][j][k];
+          if(j<ySimSize)
+            targetMatrix[i][j][k]+= A[i][j-1][k].jUp * aMatrix[i][j-1][k];
+          if(k<zSimSize)
+            targetMatrix[i][j][k]+= A[i][j][k-1].kUp * aMatrix[i][j][k-1];
+        }
+}
+
+bool OpenGLWindow::advect(std::vector<std::vector<std::vector<std::vector<std::vector<float>>>>> args,
+                          std::vector<bool> isCentered, std::vector<float> outsideValues)
 {
   int oldIndex = 0;
   int newIndex = 1;
+
 
   // if args is empty, assume only u,v,w and p need to be updated
 
   if(args.size() != isCentered.size()){
       std::cout<<"args and isCentered mismatch";
       return false;
-    }
-  if(newArgs.size() != isCentered.size()){
-      std::cout<<"newArgs and isCentered mismatch";
+  }
+  if(args.size() != outsideValues.size()){
+      std::cout<<"args and outsideValues mismatch";
       return false;
-    }
+  }
+
   int k=0;
   for(auto c:args){
-
-      std::vector cNew = newArgs[k++];
 
       if(isCentered[k]==0){
 
@@ -242,9 +439,9 @@ bool OpenGLWindow::advect(std::vector args, std::vector newArgs, std::vector<boo
                     for(int j=0;j<2;j++)
                       for(int k=0;k<2;k++){
                           if(ixp+i>=xSimSize || iyp+j>=ySimSize || izp+k>=zSimSize){ // outside the simulation volume, there is a constant value for the quantity
-                            c[newIndex][x][y][z] += outsideValues[k];
+                            c[newIndex][ix][iy][iz] += outsideValues[k];
                             continue;}
-                          c[newIndex][x][y][z]+=(i?ax:(1-ax))*(j?ay:(1-ay))*(k?(1-az):az)*c[ixp+i][iyp+j][izp+k];
+                          c[newIndex][ix][iy][iz]+=(i?ax:(1-ax))*(j?ay:(1-ay))*(k?(1-az):az)*c[newIndex][ixp+i][iyp+j][izp+k];
                         }
                 }
         }
@@ -254,8 +451,8 @@ bool OpenGLWindow::advect(std::vector args, std::vector newArgs, std::vector<boo
           float xn, xp, yn, yp, zn, zp, ax, ay, az;
           int ixp, iyp, izp;
 
-          xSize = c[oldIndex].size();
-          ySize = c[oldIndex][0].size();
+          xSize = c.size();
+          ySize = c[0].size();
           zSize = c[0][0].size();
 
           for(size_t ix=0;ix<xSize;ix++)
@@ -269,27 +466,27 @@ bool OpenGLWindow::advect(std::vector args, std::vector newArgs, std::vector<boo
                   // we use Forward Euler (might update to RK2)
                   // (ixp,iyp,izp) are the indices of the grid wall (xpFloor,ypFloor,zpFloor) such that xp is in [xpFloor, xpFloor+dx), yp is in [ypFloor, ypFloor+dx), zp is in [zpFloor, zpFloor+dx)
                   xn = dx * ix;
-                  xp = xn - dt * u[oldIndex][x][y][z];
+                  xp = xn - dt * u[oldIndex][ix][iy][iz];
                   ixp = floor(xp/dx);
                   ax = dx * ixp;
 
                   yn = dx * iy;
-                  yp = yn - dt * v[oldIndex][x][y][z];
+                  yp = yn - dt * v[oldIndex][ix][iy][iz];
                   iyp = floor(yp/dx);
                   ay = dx * iyp;
 
                   zn = dx * iz;
-                  zp = zn - dt * w[oldIndex][x][y][z];
+                  zp = zn - dt * w[oldIndex][ix][iy][iz];
                   izp = floor(zp/dx);
                   az = dx * izp;
 
-                  for(i=0;i<2;i++)
-                    for(j=0;j<2;j++)
-                      for(k=0;k<2;k++){
+                  for(int i=0;i<2;i++)
+                    for(int j=0;j<2;j++)
+                      for(int k=0;k<2;k++){
                           if(ixp+i>=xSize || iyp+j>=ySize || izp+k>=zSize){ // outside the simulation volume, there is a constant value for the quantity
-                            c[newIndex][x][y][z] += outsideValues[k];
+                            c[newIndex][ix][iy][iz] += outsideValues[k];
                             continue;}
-                          c[newIndex][x][y][z]+=(i?ax:(1-ax))*(j?ay:(1-ay))*(k?(1-az):az)*c[ixp+i][iyp+j][izp+k];
+                          c[newIndex][ix][iy][iz]+=(i?ax:(1-ax))*(j?ay:(1-ay))*(k?(1-az):az)*c[newIndex][ixp+i][iyp+j][izp+k];
                         }
 
                 }

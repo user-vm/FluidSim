@@ -3,6 +3,7 @@
 #include <GL/glew.h>
 #include <QOpenGLWindow>
 #include <QElapsedTimer>
+#include <ngl/Vec3.h>
 
 class OpenGLWindow : public QOpenGLWindow
 {
@@ -28,11 +29,14 @@ class OpenGLWindow : public QOpenGLWindow
     /// this is only called one time, just after we have a valid GL context use this to init any global GL elements
     //----------------------------------------------------------------------------------------------------------------------
     void initializeGL();
-    class point3D{
-    public:
-      point3D(GLfloat x, GLfloat y, GLfloat z);
-      point3D();
-      GLfloat m_x, m_y, m_z;
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief the struct defining the elements of the coefficient matrix for use in the projection function
+    //----------------------------------------------------------------------------------------------------------------------
+    struct SevenPointLagrangianMatrixElement{
+      float diag; // A(i,j,k)(i,j,k)
+      float iUp;  // A(i,j,k)(i+1,j,k)
+      float jUp;  // A(i,j,k)(i,j+1,k)
+      float kUp;  // A(i,j,k)(i,j,k+1)
     };
   private:
     //----------------------------------------------------------------------------------------------------------------------
@@ -62,7 +66,8 @@ class OpenGLWindow : public QOpenGLWindow
     /// @param[out] args updated with new quantity values
     /// @returns true on success, false on failure (if args and isCentered don't match)
     //----------------------------------------------------------------------------------------------------------------------
-    bool advect(std::vector<void*> args, std::vector<void*> newArgs, std::vector<bool> isCentered, std::vector<float>outsideValues);
+    bool advect(std::vector<std::vector<std::vector<std::vector<std::vector<float>>>>> args,
+                              std::vector<bool> isCentered, std::vector<float> outsideValues);
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief advection function (alternate constructor); takes args to contain u,v,w and p
     /// @returns true
@@ -71,7 +76,47 @@ class OpenGLWindow : public QOpenGLWindow
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief projection function
     //----------------------------------------------------------------------------------------------------------------------
-    void project();
+    bool project(std::vector<std::vector<std::vector<SevenPointLagrangianMatrixElement>>> A, std::vector<std::vector<std::vector<float>>> z,
+                 std::vector<std::vector<std::vector<float>>> d, std::vector<std::vector<std::vector<float>>> r,
+                 std::vector<std::vector<std::vector<float>>> s, std::vector<std::vector<std::vector<float>>> precon,
+                 std::vector<std::vector<std::vector<float>>> q);
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief function to add new animation frame of grid pressure data
+    //----------------------------------------------------------------------------------------------------------------------
+    void addPressureFrameData();
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief function to add new animation frame of grid velocity data
+    //----------------------------------------------------------------------------------------------------------------------
+    void addVelocityFrameData();
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief function to bake fluid simulation
+    //----------------------------------------------------------------------------------------------------------------------
+    void bake();
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief function to put the initial values into the pressure grid
+    //----------------------------------------------------------------------------------------------------------------------
+    void initializePressure(std::vector<std::vector<std::vector<float>>> pInitial);
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief function to load the initial values into the velocity grids (u,v,w)
+    //----------------------------------------------------------------------------------------------------------------------
+    void initializeVelocity(std::vector<std::vector<std::vector<float>>> uInitial, std::vector<std::vector<std::vector<float>>> vInitial, std::vector<std::vector<std::vector<float>>> wInitial);
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief function to load the initial values into the velocity grids (u,v,w)
+    //----------------------------------------------------------------------------------------------------------------------
+    float dotProduct(std::vector<std::vector<std::vector<float>>> aMatrix, std::vector<std::vector<std::vector<float>>> bMatrix);
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief function to load the initial values into the velocity grids (u,v,w)
+    //----------------------------------------------------------------------------------------------------------------------
+    bool applyA(std::vector<std::vector<std::vector<float>>> aMatrix, std::vector<std::vector<std::vector<float>>> targetMatrix,
+                std::vector<std::vector<std::vector<SevenPointLagrangianMatrixElement>>> A);
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief function to apply preconditioner  to residual "vector" (3d matrix) and set sigma to dotproduct of z and r
+    //----------------------------------------------------------------------------------------------------------------------
+    bool applyPreconditioner(float& sigma, std::vector<std::vector<std::vector<SevenPointLagrangianMatrixElement>>> A,
+                             std::vector<std::vector<std::vector<float>>> z, std::vector<std::vector<std::vector<float>>> d,
+                             std::vector<std::vector<std::vector<float>>> r, std::vector<std::vector<std::vector<float>>> s,
+                             std::vector<std::vector<std::vector<float>>> precon, std::vector<std::vector<std::vector<float>>> q);
+
 
     /// @brief a simple draw grid function
     /// @brief a pointer to our VBO data
@@ -114,7 +159,7 @@ class OpenGLWindow : public QOpenGLWindow
     //----------------------------------------------------------------------------------------------------------------------
     std::vector<std::vector<std::vector<std::vector<float>>>> p;
     //----------------------------------------------------------------------------------------------------------------------
-    /// @brief the u, v and w velocities (along x, y and z axes, respectively
+    /// @brief the u, v and w velocities (along x, y and z axes, respectively; +y is up)
     //----------------------------------------------------------------------------------------------------------------------
     std::vector<std::vector<std::vector<std::vector<float>>>> u, v, w;
     //----------------------------------------------------------------------------------------------------------------------
@@ -124,7 +169,7 @@ class OpenGLWindow : public QOpenGLWindow
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief the timestep
     //----------------------------------------------------------------------------------------------------------------------
-    float dt;
+    float dt = 1E-2;
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief the frame duration (1/framerate)
     //----------------------------------------------------------------------------------------------------------------------
@@ -140,27 +185,9 @@ class OpenGLWindow : public QOpenGLWindow
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief the default gravitational acceleration
     //----------------------------------------------------------------------------------------------------------------------
-    float g = -9.81;
+    ngl::Vec3 g = ngl::Vec3(0.0,-9.81,0);
 
     // now project() stuff
-
-    //----------------------------------------------------------------------------------------------------------------------
-    /// @brief the class defining the elements of the coefficient matrix for use in the projection function
-    //----------------------------------------------------------------------------------------------------------------------
-    class SevenPointLagrangianMatrixElement{
-      float diag; // A(i,j,k)(i,j,k)
-      float iUp;  // A(i,j,k)(i+1,j,k)
-      float jUp;  // A(i,j,k)(i,j+1,k)
-      float kUp;  // A(i,j,k)(i,j,k+1)
-    };
-    //----------------------------------------------------------------------------------------------------------------------
-    /// @brief the coefficient matrix for use in the projection function
-    //----------------------------------------------------------------------------------------------------------------------
-    std::vector<std::vector<std:vector<SevenPointLagrangianMatrixElement>>> A;
-    //----------------------------------------------------------------------------------------------------------------------
-    /// @brief the matrix of velocity divergence
-    //----------------------------------------------------------------------------------------------------------------------
-    std::vector<std::vector<std::vector<float>>> d;
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief the tolerance for the maximum residual vector element in the projection function
     //----------------------------------------------------------------------------------------------------------------------
@@ -172,6 +199,15 @@ class OpenGLWindow : public QOpenGLWindow
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief the tuning constant for Modified Incomplete Cholesky (in project())
     //----------------------------------------------------------------------------------------------------------------------
+    const float tau = 0.97;
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief the density of the fluid
+    //----------------------------------------------------------------------------------------------------------------------
+    float rho = 1000;
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief grid cell size
+    //----------------------------------------------------------------------------------------------------------------------
+    float dx;
 
   };
 
