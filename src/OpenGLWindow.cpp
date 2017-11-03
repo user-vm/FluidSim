@@ -209,7 +209,7 @@ bool OpenGLWindow::project(std::vector<std::vector<std::vector<SevenPointLagrang
   }
 
   if(breakIteration)
-    return true;
+    it = maxIterations + 2; // give it a value that will skip the loop, but also lets us know that maxIterations was not truly exceeded
 
   //first we apply the preconditioner
   applyPreconditioner(sigma, A, z, d, r, s, precon, q);
@@ -217,8 +217,9 @@ bool OpenGLWindow::project(std::vector<std::vector<std::vector<SevenPointLagrang
   // now loop
 
   float maxAbsR, a, b;
+  int it;
 
-  for(int it=0;it<maxIterations;it++){
+  for(it=0;it<maxIterations;it++){
 
       maxAbsR = 0;
 
@@ -237,7 +238,7 @@ bool OpenGLWindow::project(std::vector<std::vector<std::vector<SevenPointLagrang
             }
 
       if(maxAbsR <= tol)
-        return true;
+        break;
 
       applyPreconditioner(sigma, A, z, d, r, s, precon, q);
 
@@ -253,7 +254,16 @@ bool OpenGLWindow::project(std::vector<std::vector<std::vector<SevenPointLagrang
 
   // now compute the new velocities
 
-  //...
+  for(i=0;i<xSimSize;i++)
+    for(j=0;j<ySimSize;j++)
+      for(k=0;k<zSimSize;k++){
+        u[newIndex][i][j][k] = -dt/rho * (p[newIndex][i+1][j][k] - p[newIndex][i][j][k]) / dx + u[oldIndex][i][j][k];
+        v[newIndex][i][j][k] = -dt/rho * (p[newIndex][i][j+1][k] - p[newIndex][i][j][k]) / dx + v[oldIndex][i][j][k];
+        w[newIndex][i][j][k] = -dt/rho * (p[newIndex][i][j][k+1] - p[newIndex][i][j][k]) / dx + v[oldIndex][i][j][k];
+      }
+
+  if(it < maxIterations || it == maxIterations + 2)
+    return true;
 
   return false;
 }

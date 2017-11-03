@@ -11,9 +11,11 @@ CONFIG-=app_bundle
 CONFIG+=c++11
 QT+= opengl core
 SOURCES+= $$PWD/src/main.cpp \
-          $$PWD/src/OpenGLWindow.cpp
+          $$PWD/src/OpenGLWindow.cpp \
+          $$PWD/src/Bake.cpp
 
-HEADERS+= $$PWD/include/OpenGLWindow.h
+HEADERS+= $$PWD/include/OpenGLWindow.h \
+          $$PWD/include/Bake.h
 INCLUDEPATH+=$$PWD/include/
 DESTDIR=./
 
