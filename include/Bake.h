@@ -4,13 +4,15 @@
 #include <string>
 #include <cstdio>
 #include <memory>
+#include <cmath>
+#include <boost/variant.hpp>
 
 enum GridType {GRID_3D = 1, GRID_3D_TWOSTEP = 2, GRID_3D_7PL = 3};
 
 // a representation of a 6D seven point Lagrangian matrix, containing only four values due to symmetry
 class SevenPointLagrangianMatrix{
 public:
-  SevenPointLagrangianMatrix();
+  SevenPointLagrangianMatrix(size_t xSize, size_t ySize, size_t zSize);
   ~SevenPointLagrangianMatrix();
 
   struct SevenPointLagrangianMatrixElement{
@@ -20,14 +22,22 @@ public:
     float kUp;  // A(i,j,k)(i,j,k+1)
   };
 
-  float get(size_t x,size_t y,size_t z);
+  static constexpr SevenPointLagrangianMatrixElement NAN_7PLM_ELEMENT = {NAN, NAN, NAN, NAN};
+
+  SevenPointLagrangianMatrixElement get(size_t x,size_t y,size_t z);
+
+  size_t xSize();
+
+  size_t ySize();
+
+  size_t zSize();
 
 private:
 
-  std::unique_ptr<std::vector<SevenPointLagrangianMatrixElement>> data;
-  size_t xSize;
-  size_t ySize;
-  size_t zSize;
+  std::vector<SevenPointLagrangianMatrixElement> data;
+  size_t _xSize;
+  size_t _ySize;
+  size_t _zSize;
 };
 
 // 3D fixed-size matrix
@@ -69,18 +79,24 @@ public:
 
 private:
   size_t _xSize, _ySize, _zSize;
-  std::unique_ptr<std::vector<float>> data;
+  std::vector<float> data;
 };
 
 // container for two Matrix3D, "old" and "new"
-class TwoStepMatrix3D{
-public:
-  TwoStepMatrix3D();
-  ~TwoStepMatrix3D();
-
+struct TwoStepMatrix3D{
   Matrix3D newM;
   Matrix3D oldM;
-};
+}
+/*
+class TwoStepMatrix3D{
+public:
+  TwoStepMatrix3D(size_t x_Size, size_t y_Size, size_t z_Size);
+  ~TwoStepMatrix3D();
+
+private:
+  std::unique_ptr<Matrix3D> newM;
+  std::unique_ptr<Matrix3D> oldM;
+};*/
 
 // class for creating tuples with information to add a grid to the GridHolder singleton
 class GridTuple{
@@ -88,8 +104,9 @@ public:
   GridTuple(std::string gridName, GridType gridType, size_t x, size_t y, size_t z);
   ~GridTuple();
 
+  friend class GridsHolder;
+
 private:
-  enum GridType {GRID_3D_TWOSTEP = 2, GRID_3D = 1};
   GridType _gridType;
   std::string _gridName;
   size_t _x,_y,_z;
@@ -98,19 +115,21 @@ private:
 class GridsHolder{
 
 public:
-  GridsHolder(std::vector<GridTuple>);
+  GridsHolder(std::vector<GridTuple> listOfGrids);
   ~GridsHolder();
 
-  static GridsHolder *s_instance;
+  size_t size();
 
 private:
+  // union doesn't work for these classes, at least not like this
+  /*
   union Matrix{
-    std::vector<Matrix3D> _3D;
-    std::vector<TwoStepMatrix3D> _twoStep3D;
-    std::vector<SevenPointLagrangianMatrix> _sevenPointLagrangian;
-  };
+    Matrix3D _3D;
+    TwoStepMatrix3D _twoStep3D;
+    SevenPointLagrangianMatrix _sevenPointLagrangian;
+  };*/
   std::vector<std::string> _gridNames;
-  std::vector<Matrix> _grids;
+  std::vector<boost::variant<Matrix3D, SevenPointLagrangianMatrix, TwoStepMatrix3D>> _grids;
   std::vector<GridType> _gridTypes;
 };
 
