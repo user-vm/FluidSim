@@ -9,6 +9,7 @@
 #include <boost/variant.hpp>
 #include <utility>
 #include <iostream>
+#include <ngl/Vec3.h>
 
 enum GridType {GRID_3D = 1, GRID_3D_TWOSTEP = 2, GRID_3D_7PL = 3};
 
@@ -75,6 +76,12 @@ public:
 
   size_t zSize();
 
+  bool isCentered();
+
+  float getOutsideValue();
+
+  bool setOutsideValue(float value);
+
   friend class GridsHolder;
   friend class TwoStepMatrix3D;
 
@@ -88,6 +95,8 @@ private:
   Matrix3D(size_t xSize, size_t ySize, size_t zSize);
   size_t _xSize, _ySize, _zSize;
   std::vector<float> data;
+  bool _isCentered;
+  float outsideValue;
 };
 /*
 // container for two Matrix3D, "old" and "new"
@@ -114,6 +123,12 @@ public:
 
   void swap();
 
+  bool isCentered();
+
+  bool setOutsideValue(float value);
+
+  float getOutsideValue();
+
   friend class GridsHolder;
 
 private:
@@ -126,6 +141,7 @@ private:
 // class for creating tuples with information to add a grid to the GridHolder singleton
 class GridTuple{
 public:
+  //GridTuple()
   GridTuple(std::string gridName, GridType gridType, size_t x, size_t y, size_t z);
   ~GridTuple();
 
@@ -140,7 +156,7 @@ private:
 class GridsHolder{
 
 public:
-  GridsHolder(std::vector<GridTuple> listOfGrids);
+  GridsHolder(std::vector<GridTuple> listOfGrids, float gridCellSize);
   ~GridsHolder();
 
   size_t size();
@@ -153,6 +169,14 @@ public:
 
   TwoStepMatrix3D* getTwoStepMatrix3DByName(std::string name);
 
+  bool advect(std::vector<std::string> gridsToAdvectNames);
+
+  bool advect(std::vector<std::string> gridsToAdvectNames, float dt);
+
+  bool applyPreconditioner(std::string targetName, float& sigma);
+
+  bool applyPreconditioner(std::string targetName, float& sigma, std::vector<std::array<std::string,2>> renamedVariables);
+
 private:
   // union doesn't work for these classes, at least not like this
   /*
@@ -163,9 +187,21 @@ private:
   };*/
   //typedef std::array<std::unique_ptr<Matrix3D>,2> TwoStepMatrix3D;
 
+  // this is probably stupid, so it'll be private
+  template<class T>
+  T* getAnyByName(std::string name);
+
+  GridType getTypeByName(std::string name);
+
   std::vector<std::string> _gridNames;
   std::vector<GridElement> _grids;
   std::vector<GridType> _gridTypes;
+
+  // grid cell size
+  float dx;
+
+  // timestep; for now changes only when next frame is less than default_dt away
+  float default_dt;
 };
 
 #endif
