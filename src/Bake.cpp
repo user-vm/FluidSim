@@ -129,26 +129,64 @@ size_t SevenPointLagrangianMatrix::zSize(){
 
 SevenPointLagrangianMatrix::SevenPointLagrangianMatrixElement SevenPointLagrangianMatrix::get(size_t x,size_t  y, size_t z){
 
-
   if (x >= _xSize || y >= _ySize || z >= _zSize)
     return NAN_7PLM_ELEMENT;
 
   return data[_zSize * ((_ySize * x) + y) + z];
 }
 
+// TwoStepMatrix3D functions
+
 TwoStepMatrix3D::TwoStepMatrix3D(size_t x_Size, size_t y_Size, size_t z_Size){
 
-  std::unique_ptr<Matrix3D> newPointer(new Matrix3D(x_Size, y_Size, z_Size));
-  newM.swap(newPointer);
-
-  std::unique_ptr<Matrix3D> oldPointer(new Matrix3D(x_Size, y_Size, z_Size));
-  oldM.swap(oldPointer);
+  newM = new Matrix3D(x_Size, y_Size, z_Size);
+  oldM = new Matrix3D(x_Size, y_Size, z_Size);
 }
 
 TwoStepMatrix3D::~TwoStepMatrix3D(){
 
-  newM.reset();
-  oldM.reset();
+  delete newM;
+  delete oldM;
+}
+
+float TwoStepMatrix3D::getNew(size_t x, size_t y, size_t z){
+
+  return newM->get(x,y,z);
+}
+
+float TwoStepMatrix3D::getOld(size_t x, size_t y, size_t z){
+
+  return oldM->get(x,y,z);
+}
+
+bool TwoStepMatrix3D::setNew(size_t x, size_t y, size_t z, float value){
+
+  return newM->set(x,y,z,value);
+}
+
+bool TwoStepMatrix3D::setOld(size_t x, size_t y, size_t z, float value){
+
+  return oldM->set(x,y,z,value);
+}
+
+size_t TwoStepMatrix3D::xSize(){
+
+  return newM->xSize();
+}
+
+size_t TwoStepMatrix3D::ySize(){
+
+  return newM->ySize();
+}
+
+size_t TwoStepMatrix3D::zSize(){
+
+  return newM->zSize();
+}
+
+void TwoStepMatrix3D::swap(){
+
+  std::swap(newM, oldM);
 }
 
 // GridTuple functions
@@ -169,15 +207,23 @@ GridTuple::~GridTuple(){}
 
 GridsHolder::GridsHolder(std::vector<GridTuple> listOfGrids){
 
+  // custom lambda compare function; list gets sorted alphabetically
+  std::sort(listOfGrids.begin(),listOfGrids.end(), [](GridTuple a, GridTuple b){
+    return a._gridName < b._gridName;} );
+
   for(auto i: listOfGrids){
+
+      // if a duplicate element name is hit, skip it
+      if(!_gridNames.empty() && i._gridName == _gridNames.back()){
+          std::cout<<"Skipping grid \""<<i._gridName<<"\" of type "<<(i._gridType?((i._gridType==1)\
+                     ?"TwoStepMatrix3D":"SevenPointLagrangianMatrix"):"Matrix3D")<<" with duplicate name\n";
+          continue;}
 
       switch(i._gridType){
 
-        case GRID_3D:         _grids.push_back(Matrix3D(i._x,i._y,i._z));
-        case GRID_3D_7PL:     _grids.push_back(SevenPointLagrangianMatrix(i._x,i._y,i._z));
-        case GRID_3D_TWOSTEP: {
-            TwoStepMatrix3D X = {};
-            _grids.push_back(TwoStepMatrix3D(i._x,i._y,i._z));
+        case GRID_3D:         _grids.push_back(GridElement(new Matrix3D(i._x,i._y,i._z)));
+        case GRID_3D_7PL:     _grids.push_back(GridElement(new SevenPointLagrangianMatrix(i._x,i._y,i._z)));
+        case GRID_3D_TWOSTEP: _grids.push_back(GridElement(new TwoStepMatrix3D(i._x,i._y,i._z)));
         default:              continue;
         }
 
@@ -185,8 +231,33 @@ GridsHolder::GridsHolder(std::vector<GridTuple> listOfGrids){
       _gridTypes.push_back(i._gridType);
 
     }
+
 }
 
 size_t GridsHolder::size(){
   return _gridNames.size();
+}
+
+Matrix3D* GridsHolder::getMatrix3DByName(std::string name){
+  for(size_t i=0;i<_gridTypes.size();i++)
+    if(_gridTypes[i] == GRID_3D && _gridNames[i]==name)
+      return boost::get<Matrix3D*>(_grids[i]);
+
+  return NULL;
+}
+
+SevenPointLagrangianMatrix* GridsHolder::getSevenPointLagrangianMatrixByName(std::string name){
+  for(size_t i=0;i<_gridTypes.size();i++)
+    if(_gridTypes[i] == GRID_3D_7PL && _gridNames[i]==name)
+      return boost::get<SevenPointLagrangianMatrix*>(_grids[i]);
+
+  return NULL;
+}
+
+TwoStepMatrix3D* GridsHolder::getTwoStepMatrix3DByName(std::string name){
+  for(size_t i=0;i<_gridTypes.size();i++)
+    if(_gridTypes[i] == GRID_3D_TWOSTEP && _gridNames[i]==name)
+      return boost::get<TwoStepMatrix3D*>(_grids[i]);
+
+  return NULL;
 }
