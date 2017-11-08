@@ -11,12 +11,14 @@
 #include <iostream>
 #include <ngl/Vec3.h>
 
+#define TAU_TUNING_CONSTANT 0.97
+
 enum GridType {GRID_3D = 1, GRID_3D_TWOSTEP = 2, GRID_3D_7PL = 3};
 
 // a representation of a 6D seven point Lagrangian matrix, containing only four values due to symmetry
 class SevenPointLagrangianMatrix{
 public:
-  SevenPointLagrangianMatrix(size_t xSize, size_t ySize, size_t zSize);
+  SevenPointLagrangianMatrix(size_t xSize, size_t ySize, size_t zSize, bool defaultInitialization);
   ~SevenPointLagrangianMatrix();
 
   struct SevenPointLagrangianMatrixElement{
@@ -66,9 +68,9 @@ public:
   //----------------------------------------------------------------------------------------------------------------------
   float get(size_t x,size_t y,size_t z);
 
-  float dotproduct(Matrix3D bMatrix);
+  float dotProduct(Matrix3D* bMatrix);
 
-  bool apply7PLMatrix(SevenPointLagrangianMatrix A, Matrix3D targetMatrix);
+  bool apply7PLMatrix(SevenPointLagrangianMatrix* A, Matrix3D* targetMatrix);
 
   size_t xSize();
 
@@ -143,6 +145,7 @@ class GridTuple{
 public:
   //GridTuple()
   GridTuple(std::string gridName, GridType gridType, size_t x, size_t y, size_t z);
+  GridTuple(std::string gridName, GridType gridType, size_t x, size_t y, size_t z, float outsideValue);
   ~GridTuple();
 
   friend class GridsHolder;
@@ -151,13 +154,24 @@ private:
   GridType _gridType;
   std::string _gridName;
   size_t _x,_y,_z;
+  float _outsideValue;
 };
 
 class GridsHolder{
 
 public:
-  GridsHolder(std::vector<GridTuple> listOfGrids, float gridCellSize);
+  GridsHolder(std::vector<GridTuple> listOfGrids, float gridCellSize, float timeStep,
+              float projectionTolerance, size_t maxIterations,
+              float density, ngl::Vec3 g);
   ~GridsHolder();
+
+  bool append(std::vector<GridTuple> listOfGrids);
+
+  bool append(GridTuple gridTuple);
+
+  bool append(std::unique_ptr<GridTuple>);
+
+  bool append(std::vector<std::unique_ptr<GridTuple>> listOfGrids);
 
   size_t size();
 
@@ -169,13 +183,37 @@ public:
 
   TwoStepMatrix3D* getTwoStepMatrix3DByName(std::string name);
 
+  //----------------------------------------------------------------------------------------------------------------------
+  /// @brief advection function
+  //----------------------------------------------------------------------------------------------------------------------
   bool advect(std::vector<std::string> gridsToAdvectNames);
-
   bool advect(std::vector<std::string> gridsToAdvectNames, float dt);
 
+  //----------------------------------------------------------------------------------------------------------------------
+  /// @brief function to apply preconditioner  to residual "vector" (3d matrix) and set sigma to dotproduct of z and r
+  //----------------------------------------------------------------------------------------------------------------------
   bool applyPreconditioner(std::string targetName, float& sigma);
 
+  // todo: the renamed thing doesn't do anything
   bool applyPreconditioner(std::string targetName, float& sigma, std::vector<std::array<std::string,2>> renamedVariables);
+
+  void setDefaultTimestep(float value);
+
+  void setDefaultDx(float value);
+
+  void setDefaultMaxIterations(size_t value);
+
+  //----------------------------------------------------------------------------------------------------------------------
+  /// @brief projection function
+  //----------------------------------------------------------------------------------------------------------------------
+  bool project();
+  bool project(float dt);
+
+  // just provide NAN, zero or negative values (the latter only for the first two) to use defaults
+  bool project(float dt, float tol, size_t maxIterations);
+
+  bool body();
+  bool body(float dt);
 
 private:
   // union doesn't work for these classes, at least not like this
@@ -196,12 +234,25 @@ private:
   std::vector<std::string> _gridNames;
   std::vector<GridElement> _grids;
   std::vector<GridType> _gridTypes;
+  std::vector<float> _outsideValues;
 
-  // grid cell size
+  // grid cell size, default 0.01
   float dx;
 
-  // timestep; for now changes only when next frame is less than default_dt away
+  // timestep; for now changes only when next frame is less than default_dt away; default 0.01
   float default_dt;
+
+  // default tolerance
+  float default_tol;
+
+  // default maximum iterations of projection function
+  size_t default_maxIterations;
+
+  // density (might be variable over volume or time, so this might not be enough)
+  float _density;
+
+  // gravitational acceleration
+  ngl::Vec3 _g;
 };
 
 #endif

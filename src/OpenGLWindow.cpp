@@ -27,150 +27,6 @@ OpenGLWindow::~OpenGLWindow()
   glDeleteBuffers(1,&m_vboPointer);
 }
 
-void OpenGLWindow::addPressureFrameData(){
-
-}
-
-void OpenGLWindow::addVelocityFrameData(){
-
-}
-
-void OpenGLWindow::initializePressure(std::vector<std::vector<std::vector<float>>> pInitial){
-
-  // here we will populate the pressure grid with its initial values
-  // nothing here at the moment, so grid will be all zeroes
-}
-
-void OpenGLWindow::initializeVelocity(std::vector<std::vector<std::vector<float>>> uInitial, std::vector<std::vector<std::vector<float>>> vInitial, std::vector<std::vector<std::vector<float>>> wInitial){
-
-  // here we will populate the velocity grids with their initial values
-  // nothing here at the moment, so grids will be all zeroes
-}
-
-void OpenGLWindow::bake(){
-
-  dx = cubeSize;
-
-  simTime = 0.0;
-  size_t k=0;
-  std::vector<std::vector<std::vector<std::vector<std::vector<float>>>>> args = {w,v,u,p};
-  std::vector<bool> isCentered = {true, true, true, false};
-  std::vector<float> outsideValues = {0,0,0,0}; // take outside velocity to be 0 for now (smoke-like)
-  std::vector<std::vector<std::vector<SevenPointLagrangianMatrixElement>>> A;
-
-  std::vector<std::vector<std::vector<float>>> r, z, s, d, precon, q;
-
-  addPressureFrameData();
-  addVelocityFrameData();
-  size_t currentFrame = 0;
-
-  // build all the grid matrices
-
-  p.resize(2);
-  u.resize(2);
-  v.resize(2);
-  w.resize(2);
-
-  std::vector<std::vector<std::vector<std::vector<float>>>> centeredVarVect = {r,s,z,d,precon,q,p[0]};
-
-  u.resize(xSimSize+1);
-  v.resize(xSimSize);
-  w.resize(xSimSize);
-
-  for(int i=0;i<xSimSize;i++){
-      for(auto q1: centeredVarVect)
-        q1.resize(ySimSize);
-      u[0][i].resize(ySimSize);
-      v[0][i].resize(ySimSize+1);
-      w[0][i].resize(ySimSize);
-      for(int j=0;j<ySimSize;j++){
-          for(auto q : centeredVarVect)
-            q[i][j].resize(zSimSize);
-
-          u[0][i][j].resize(zSimSize);
-          v[0][i][j].resize(zSimSize);
-          w[0][i][j].resize(zSimSize+1);
-
-        }
-      v[ySimSize].resize(zSimSize);
-    }
-
-  for(int j=0;j<ySimSize;j++)
-    u[0][xSimSize][j].resize(zSimSize);
-
-  u[1] = u[0];
-  v[1] = v[0];
-  w[1] = w[0];
-
-  p[1] = p[0];
-
-  initializePressure(p[0]);
-  initializeVelocity(u[0],v[0],w[0]);
-
-  // prepare A matrix; since walls are not implemented yet, all diag values will be 6, and all other values will be -1, except at the (xSimSize-1, ySimSize-1, zSimSize-1) corner
-
-  for(int ai=0;ai<xSimSize;ai++)
-    for(int aj=0;aj<ySimSize;aj++)
-      for(int ak=0;ak<zSimSize;ak++){
-
-          A[ai][aj][ak].diag = 6;
-
-          if(ai<xSimSize-1)
-            A[ai][aj][ak].iUp = -1;
-          else
-            A[ai][aj][ak].iUp = 0;
-
-          if(aj<ySimSize-1)
-            A[ai][aj][ak].jUp = -1;
-          else
-            A[ai][aj][ak].jUp = 0;
-
-          if(ak<zSimSize-1)
-            A[ai][aj][ak].kUp = -1;
-          else
-            A[ai][aj][ak].kUp = 0;
-
-        }
-
-  while(simTime<=totalSimTime-dt){
-
-      // only need information for two consectutive time steps
-      // ADVECT RUNS WITH [0] AS OLD, BODY REWRITES [1], PROJECT RUNS WITH [1] AS OLD, REPEAT
-      advect(args,isCentered,outsideValues);
-
-      // body function is just updating the velocities to account for gravity
-      for(int i=0;i<=xSimSize;i++)
-        for(int j=0;j<=ySimSize;j++)
-          for(int k=0;k<=zSimSize;k++){
-
-            if(i==xSimSize){
-              u[1][i][j][k] += g.m_x * dt;
-              continue;}
-            else
-              if(j==ySimSize){
-                v[1][i][j][k] += g.m_y * dt;
-                continue;}
-              else
-                if(k==zSimSize){
-                    w[1][i][j][k] += g.m_z * dt;
-                    continue;}
-
-            u[1][i][j][k] += g.m_x * dt;
-            v[1][i][j][k] += g.m_y * dt;
-            w[1][i][j][k] == g.m_z * dt;
-            }
-
-      project(A,z,d,r,s,precon,q);
-      simTime += dt;
-
-      if(fmod(simTime,dt) >= currentFrame){
-          addPressureFrameData();
-          addVelocityFrameData();
-          currentFrame++;
-        }
-    }
-}
-
 void OpenGLWindow::initializeGL()
 {
 
@@ -361,4 +217,107 @@ void OpenGLWindow::resizeGL(int _w, int _h)
   m_height = static_cast<int>( ((_w<_h)?_w:_h) * devicePixelRatio() );
   m_xOffset = (_w - m_width)/2;
   m_yOffset = (_h - m_height) / 2;
+}
+
+void OpenGLWindow::addPressureFrameData(){
+
+  pressureFrameData.resize
+}
+
+void OpenGLWindow::addVelocityFrameData(){
+
+}
+
+void OpenGLWindow::initializePressure(GridsHolder *gridsHolder){
+
+  // here we will populate the pressure grid with its initial values
+  // nothing here at the moment, so grid will be all zeroes
+}
+
+void OpenGLWindow::initializeVelocity(GridsHolder *gridsHolder){
+
+  // here we will populate the velocity grids with their initial values
+  // nothing here at the moment, so grids will be all zeroes
+}
+
+void OpenGLWindow::bake(){
+
+  float dx = cubeSize;
+
+  float simTime = 0.0;
+
+  // need to initialize matrices
+
+  std::vector<GridTuple> gridsToMake = {GridTuple("u",GRID_3D_TWOSTEP,xSimSize+1,ySimSize,zSimSize),
+                                         GridTuple("v",GRID_3D_TWOSTEP,xSimSize,ySimSize+1,zSimSize),
+                                         GridTuple("w",GRID_3D_TWOSTEP,xSimSize,ySimSize,zSimSize+1),
+                                         GridTuple("p",GRID_3D,xSimSize,ySimSize,zSimSize),
+                                         GridTuple("r",GRID_3D,xSimSize,ySimSize,zSimSize),
+                                         GridTuple("z",GRID_3D,xSimSize,ySimSize,zSimSize),
+                                         GridTuple("s",GRID_3D,xSimSize,ySimSize,zSimSize),
+                                         GridTuple("d",GRID_3D,xSimSize,ySimSize,zSimSize),
+                                         GridTuple("precon",GRID_3D,xSimSize,ySimSize,zSimSize),
+                                         GridTuple("q",GRID_3D,xSimSize,ySimSize,zSimSize)};
+
+
+  std::unique_ptr<GridsHolder> grids(new GridsHolder(gridsToMake,
+                                                     dx, dt, tol, maxIterations, rho, g));
+
+  addPressureFrameData();
+  addVelocityFrameData();
+  size_t currentFrame = 0;
+
+  initializePressure(grids.get());
+  initializeVelocity(grids.get());
+
+  // prepare A matrix; since walls are not implemented yet, all diag values will be 6, and all other values will be -1, except at the (xSimSize-1, ySimSize-1, zSimSize-1) corner
+
+  while(simTime<=totalSimTime-dt){
+
+      // only need information for two consectutive time steps
+      // ADVECT RUNS WITH [0] AS OLD, BODY REWRITES [1], PROJECT RUNS WITH [1] AS OLD, REPEAT
+      grids.get()->advect({"u","v","w","p"});
+
+      // body function is just updating the velocities to account for gravity
+      grids.get()->body();
+
+
+      grids.get()->project();
+      simTime += dt;
+
+      if(fmod(simTime,dt) >= currentFrame){
+          addPressureFrameData();
+          addVelocityFrameData();
+          currentFrame++;
+        }
+    }
+}
+
+size_t OpenGLWindow::FrameData::xSize(){
+
+  return x_Size;
+}
+
+size_t OpenGLWindow::FrameData::ySize(){
+
+  return y_Size;
+}
+
+size_t OpenGLWindow::FrameData::zSize(){
+
+  return z_Size;
+}
+
+bool OpenGLWindow::FrameData::addFrame(GridsHolder gridsHolder, std::string gridName){
+
+  return addFrame(gridsHolder, gridName, num_Frames);
+}
+
+bool OpenGLWindow::FrameData::addFrame(GridsHolder gridsHolder, std::string gridName, size_t atFrame){
+
+  if(atFrame > num_Frames)
+    return false;
+
+  // grid data saves onyl two timesteps; that's why you need to copy them
+  // consider file caching in the future? (whatever that means)
 }

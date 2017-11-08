@@ -4,6 +4,7 @@
 #include <QOpenGLWindow>
 #include <QElapsedTimer>
 #include <ngl/Vec3.h>
+#include "Bake.h"
 
 class OpenGLWindow : public QOpenGLWindow
 {
@@ -29,15 +30,6 @@ class OpenGLWindow : public QOpenGLWindow
     /// this is only called one time, just after we have a valid GL context use this to init any global GL elements
     //----------------------------------------------------------------------------------------------------------------------
     void initializeGL();
-    //----------------------------------------------------------------------------------------------------------------------
-    /// @brief the struct defining the elements of the coefficient matrix for use in the projection function
-    //----------------------------------------------------------------------------------------------------------------------
-    struct SevenPointLagrangianMatrixElement{
-      float diag; // A(i,j,k)(i,j,k)
-      float iUp;  // A(i,j,k)(i+1,j,k)
-      float jUp;  // A(i,j,k)(i,j+1,k)
-      float kUp;  // A(i,j,k)(i,j,k+1)
-    };
   private:
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief event called by the timer to allow use to re-draw / animate
@@ -57,30 +49,6 @@ class OpenGLWindow : public QOpenGLWindow
     /// @returns a pointer to the allocated VBO
     void  makeCubes(GLfloat _size);
     //----------------------------------------------------------------------------------------------------------------------
-    /// @brief advection function
-    /// @param[in] args vector of pointers to the data grids to update (velocity component, pressure, temperature, etc.)
-    /// @param[in] isCentered vector of bools, true if corresponding grid data is stored at cell centers (pressure-like) or
-    /// at faces (velocity-like); must have length equal to args
-    /// @param[in] outsideValues the values of corresponding args quantities outside the simulation volume
-    /// @param[in] oldIndex true if we use args[i][1] to compute args[i][0], false if it's the other way around
-    /// @param[out] args updated with new quantity values
-    /// @returns true on success, false on failure (if args and isCentered don't match)
-    //----------------------------------------------------------------------------------------------------------------------
-    bool advect(std::vector<std::vector<std::vector<std::vector<std::vector<float>>>>> args,
-                              std::vector<bool> isCentered, std::vector<float> outsideValues);
-    //----------------------------------------------------------------------------------------------------------------------
-    /// @brief advection function (alternate constructor); takes args to contain u,v,w and p
-    /// @returns true
-    //----------------------------------------------------------------------------------------------------------------------
-    bool advect();
-    //----------------------------------------------------------------------------------------------------------------------
-    /// @brief projection function
-    //----------------------------------------------------------------------------------------------------------------------
-    bool project(std::vector<std::vector<std::vector<SevenPointLagrangianMatrixElement>>> A, std::vector<std::vector<std::vector<float>>> z,
-                 std::vector<std::vector<std::vector<float>>> d, std::vector<std::vector<std::vector<float>>> r,
-                 std::vector<std::vector<std::vector<float>>> s, std::vector<std::vector<std::vector<float>>> precon,
-                 std::vector<std::vector<std::vector<float>>> q);
-    //----------------------------------------------------------------------------------------------------------------------
     /// @brief function to add new animation frame of grid pressure data
     //----------------------------------------------------------------------------------------------------------------------
     void addPressureFrameData();
@@ -95,28 +63,13 @@ class OpenGLWindow : public QOpenGLWindow
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief function to put the initial values into the pressure grid
     //----------------------------------------------------------------------------------------------------------------------
-    void initializePressure(std::vector<std::vector<std::vector<float>>> pInitial);
+    void initializePressure(GridsHolder* gridsHolder);
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief function to load the initial values into the velocity grids (u,v,w)
     //----------------------------------------------------------------------------------------------------------------------
-    void initializeVelocity(std::vector<std::vector<std::vector<float>>> uInitial, std::vector<std::vector<std::vector<float>>> vInitial, std::vector<std::vector<std::vector<float>>> wInitial);
-    //----------------------------------------------------------------------------------------------------------------------
-    /// @brief function to load the initial values into the velocity grids (u,v,w)
-    //----------------------------------------------------------------------------------------------------------------------
-    float dotProduct(std::vector<std::vector<std::vector<float>>> aMatrix, std::vector<std::vector<std::vector<float>>> bMatrix);
-    //----------------------------------------------------------------------------------------------------------------------
-    /// @brief function to load the initial values into the velocity grids (u,v,w)
-    //----------------------------------------------------------------------------------------------------------------------
-    bool applyA(std::vector<std::vector<std::vector<float>>> aMatrix, std::vector<std::vector<std::vector<float>>> targetMatrix,
-                std::vector<std::vector<std::vector<SevenPointLagrangianMatrixElement>>> A);
-    //----------------------------------------------------------------------------------------------------------------------
-    /// @brief function to apply preconditioner  to residual "vector" (3d matrix) and set sigma to dotproduct of z and r
-    //----------------------------------------------------------------------------------------------------------------------
-    bool applyPreconditioner(float& sigma, std::vector<std::vector<std::vector<SevenPointLagrangianMatrixElement>>> A,
-                             std::vector<std::vector<std::vector<float>>> z, std::vector<std::vector<std::vector<float>>> d,
-                             std::vector<std::vector<std::vector<float>>> r, std::vector<std::vector<std::vector<float>>> s,
-                             std::vector<std::vector<std::vector<float>>> precon, std::vector<std::vector<std::vector<float>>> q);
+    void initializeVelocity(GridsHolder* gridsHolder);
 
+    // REWRITE THIS
 
     /// @brief a simple draw grid function
     /// @brief a pointer to our VBO data
@@ -209,6 +162,42 @@ class OpenGLWindow : public QOpenGLWindow
     //----------------------------------------------------------------------------------------------------------------------
     float dx;
 
-  };
+    typedef std::vector<std::vector<std::vector<std::vector<float>>>> Matrix4D;
 
-  #endif
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief data holding pressure of each cell at each frame
+    //----------------------------------------------------------------------------------------------------------------------
+    Matrix4D pressureFrameData;
+
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief data holding velocity of each cell wall at each frame
+    //----------------------------------------------------------------------------------------------------------------------
+    Matrix4D uFrameData;
+    Matrix4D vFrameData;
+    Matrix4D wFrameData;
+
+    class FrameData{
+
+    public:
+      FrameData(xSize, ySize, zSize);
+      ~FrameData();
+
+      size_t xSize();
+      size_t ySize();
+      size_t zSize();
+      size_t numFrames();
+
+    private:
+      bool addFrame(GridsHolder gridsHolder, std::string gridName);
+      bool addFrame(GridsHolder gridsHolder, std::string gridName, size_t index);
+
+      std::vector<float> data;
+      size_t x_Size;
+      size_t y_Size;
+      size_t z_Size;
+      size_t num_Frames;
+
+    };
+};
+
+#endif

@@ -47,50 +47,50 @@ size_t Matrix3D::zSize(){
   return _zSize;
 }
 
-float Matrix3D::dotproduct(Matrix3D bMatrix){
+float Matrix3D::dotProduct(Matrix3D *bMatrix){
 
   float result = 0.0;
 
-  if (this->_xSize != bMatrix._xSize || this->_ySize != bMatrix._ySize || this->_zSize != bMatrix._zSize)
+  if (this->_xSize != bMatrix->_xSize || this->_ySize != bMatrix->_ySize || this->_zSize != bMatrix->_zSize)
     return NAN;
 
   // this dotproduct treats matrices like vectors, so we can just parse the whole std::vector objects and multiply element by element
   for(size_t i;i<= _xSize;i++)
     for(size_t j;j<=_ySize;j++)
       for(size_t k;k<=_zSize;k++)
-        result += this->get(i,j,k) * bMatrix.get(i,j,k);
+        result += this->get(i,j,k) * bMatrix->get(i,j,k);
   return result;
 }
 
-bool Matrix3D::apply7PLMatrix(SevenPointLagrangianMatrix A, Matrix3D targetMatrix){
+bool Matrix3D::apply7PLMatrix(SevenPointLagrangianMatrix *A, Matrix3D *targetMatrix){
 
-  if(targetMatrix.xSize() != A.xSize() || targetMatrix.ySize() != A.ySize() || targetMatrix.zSize() != A.zSize())
+  if(targetMatrix->xSize() != A->xSize() || targetMatrix->ySize() != A->ySize() || targetMatrix->zSize() != A->zSize())
     return false;
 
-  if(xSize() != A.xSize() || ySize() != A.ySize() || zSize() != A.zSize())
+  if(xSize() != A->xSize() || ySize() != A->ySize() || zSize() != A->zSize())
     return false;
 
   for(size_t i=0;i<_xSize;i++)
     for(size_t j=0;j<_ySize;j++)
       for(size_t k=0;k<_zSize;k++){
 
-          targetMatrix.set(i,j,k,A.get(i,j,k).diag * this->get(i,j,k));
+          targetMatrix->set(i,j,k,A->get(i,j,k).diag * this->get(i,j,k));
 
           if(i<_xSize-1)
-            targetMatrix.set(i,j,k,A.get(i,j,k).iUp * this->get(i+1,j,k));
+            targetMatrix->set(i,j,k,A->get(i,j,k).iUp * this->get(i+1,j,k));
           if(j<_ySize-1)
-            targetMatrix.set(i,j,k,A.get(i,j,k).jUp * this->get(i,j+1,k));
+            targetMatrix->set(i,j,k,A->get(i,j,k).jUp * this->get(i,j+1,k));
           if(k<_zSize-1)
-            targetMatrix.set(i,j,k,A.get(i,j,k).kUp * this->get(i,j,k+1));
+            targetMatrix->set(i,j,k,A->get(i,j,k).kUp * this->get(i,j,k+1));
 
           // A[i][j][k][i-1][j][k] = A[i-1][j][k][i][j][k] (symmetry)
 
           if(i>0)
-            targetMatrix.set(i,j,k,A.get(i-1,j,k).iUp * this->get(i-1,j,k));
+            targetMatrix->set(i,j,k,A->get(i-1,j,k).iUp * this->get(i-1,j,k));
           if(j>0)
-            targetMatrix.set(i,j,k,A.get(i,j-1,k).jUp * this->get(i,j-1,k));
+            targetMatrix->set(i,j,k,A->get(i,j-1,k).jUp * this->get(i,j-1,k));
           if(k>0)
-            targetMatrix.set(i,j,k,A.get(i,j,k-1).kUp * this->get(i,j,k-1));
+            targetMatrix->set(i,j,k,A->get(i,j,k-1).kUp * this->get(i,j,k-1));
         }
 
   return true;
@@ -104,7 +104,7 @@ bool Matrix3D::isCentered(){
 
 // SevenPointLagrangianMatrix functions
 
-SevenPointLagrangianMatrix::SevenPointLagrangianMatrix(size_t xSize, size_t ySize, size_t zSize){
+SevenPointLagrangianMatrix::SevenPointLagrangianMatrix(size_t xSize, size_t ySize, size_t zSize, bool defaultInitialization){
 
   _xSize = xSize;
   _ySize = ySize;
@@ -112,6 +112,35 @@ SevenPointLagrangianMatrix::SevenPointLagrangianMatrix(size_t xSize, size_t ySiz
 
   data = std::vector<SevenPointLagrangianMatrixElement>();
   data.resize(_xSize*_ySize*_zSize);
+
+  if(defaultInitialization){
+
+      size_t pos = 0;
+
+      for(size_t ai=0;ai<xSize;ai++)
+        for(size_t aj=0;aj<ySize;aj++)
+          for(size_t ak=0;ak<zSize;ak++,pos++){
+
+              data[pos].diag = 6;
+
+              if(ai<xSize-1)
+                data[pos].iUp = -1;
+              else
+                data[pos].iUp = 0;
+
+              if(aj<ySize-1)
+                data[pos].jUp = -1;
+              else
+                data[pos].jUp = 0;
+
+              if(ak<zSize-1)
+                data[pos].kUp = -1;
+              else
+                data[pos].kUp = 0;
+
+            }
+    }
+
 }
 
 SevenPointLagrangianMatrix::~SevenPointLagrangianMatrix(){
@@ -215,19 +244,29 @@ float TwoStepMatrix3D::getOutsideValue(){
 
 GridTuple::GridTuple(std::string gridName, GridType gridType, size_t x, size_t y, size_t z){
 
+  GridTuple(gridName, gridType, x, y, z, 0.0);
+}
+
+GridTuple::GridTuple(std::string gridName, GridType gridType, size_t x, size_t y, size_t z, float outsideValue){
+
   _gridName = gridName;
   _gridType = gridType;
   _gridName = gridName;
   _x = x;
   _y = y;
   _z = z;
+  if(outsideValue != NAN)
+    _outsideValue = outsideValue;
+  else
+    _outsideValue = 0.0;
 }
 
 GridTuple::~GridTuple(){}
 
 // GridsHolder functions
 
-GridsHolder::GridsHolder(std::vector<GridTuple> listOfGrids, float gridCellSize){
+GridsHolder::GridsHolder(std::vector<GridTuple> listOfGrids, float gridCellSize, float timeStep,
+                         float projectionTolerance, size_t maxIterations, float density, ngl::Vec3 g){
 
   // custom lambda compare function; list gets sorted alphabetically
   std::sort(listOfGrids.begin(),listOfGrids.end(), [](GridTuple a, GridTuple b){
@@ -244,7 +283,7 @@ GridsHolder::GridsHolder(std::vector<GridTuple> listOfGrids, float gridCellSize)
       switch(i._gridType){
 
         case GRID_3D:         _grids.push_back(GridElement(new Matrix3D(i._x,i._y,i._z)));
-        case GRID_3D_7PL:     _grids.push_back(GridElement(new SevenPointLagrangianMatrix(i._x,i._y,i._z)));
+        case GRID_3D_7PL:     _grids.push_back(GridElement(new SevenPointLagrangianMatrix(i._x,i._y,i._z, true)));
         case GRID_3D_TWOSTEP: _grids.push_back(GridElement(new TwoStepMatrix3D(i._x,i._y,i._z)));
         default:              continue;
         }
@@ -255,6 +294,11 @@ GridsHolder::GridsHolder(std::vector<GridTuple> listOfGrids, float gridCellSize)
     }
 
   dx = gridCellSize;
+  default_dt = timeStep;
+  _density = density;
+  default_tol = projectionTolerance;
+  _g = g;
+  default_maxIterations = maxIterations;
 
 }
 
@@ -424,82 +468,180 @@ bool GridsHolder::advect(std::vector<std::string> gridsToAdvectNames, float dt)
   return advectedSomething;
 }
 
-bool OpenGLWindow::project(std::vector<std::vector<std::vector<SevenPointLagrangianMatrixElement>>> A, std::vector<std::vector<std::vector<float>>> z,
-                           std::vector<std::vector<std::vector<float>>> d, std::vector<std::vector<std::vector<float>>> r,
-                           std::vector<std::vector<std::vector<float>>> s, std::vector<std::vector<std::vector<float>>> precon,
-                           std::vector<std::vector<std::vector<float>>> q)
+void GridsHolder::setDefaultTimestep(float value){
+
+  default_dt = value;
+}
+
+bool GridsHolder::project(){
+
+  return project(default_dt, default_tol, default_maxIterations);
+}
+
+bool GridsHolder::project(float dt){
+
+  return project(dt, default_tol, default_maxIterations);
+}
+
+bool GridsHolder::project(float dt, float tol, size_t maxIterations)
 {
-  int oldIndex = 1;
-  int newIndex = 0;
+  // need A - 7PLM
+  // need z, d, s, r, precon, q - M3D
+  // need u, v, w, p - 2SM3D
+
+  // old is 1 now, and new is 0
+
+  if(dt == NAN || dt<=0.0)
+    dt = default_dt;
+
+  if(tol ==NAN || tol<=0.0)
+    tol = default_tol;
+
+  if(maxIterations == NAN)
+    maxIterations = default_maxIterations;
+
+  TwoStepMatrix3D* u = getTwoStepMatrix3DByName("u");
+  TwoStepMatrix3D* v = getTwoStepMatrix3DByName("v");
+  TwoStepMatrix3D* w = getTwoStepMatrix3DByName("w");
+  TwoStepMatrix3D* p = getTwoStepMatrix3DByName("p");
+
+  bool objectMissing = false;
+
+  if(u==NULL){
+    std::cout<<"Matrix \"u\" is missing from grid holder\n";
+    objectMissing = true;}
+
+  if(v==NULL){
+    std::cout<<"Matrix \"v\" is missing from grid holder\n";
+    objectMissing = true;}
+
+  if(w==NULL){
+    std::cout<<"Matrix \"w\" is missing from grid holder\n";
+    objectMissing = true;}
+
+  if(p==NULL){
+    std::cout<<"Matrix \"p\" is missing from grid holder\n";
+    objectMissing = true;}
+
+  if(objectMissing)
+    return false;
+
+  Matrix3D* z = getMatrix3DByName("z");
+  Matrix3D* d = getMatrix3DByName("d");
+  Matrix3D* s = getMatrix3DByName("s");
+  Matrix3D* r = getMatrix3DByName("r");
+  Matrix3D* precon = getMatrix3DByName("precon");
+  Matrix3D* q = getMatrix3DByName("q");
+
+  SevenPointLagrangianMatrix* A = getSevenPointLagrangianMatrixByName("A");
+
+  std::vector<std::pair<Matrix3D*,std::string>> utilityMatrixList = {std::make_pair(z,"z"),
+                                                                     std::make_pair(d,"d"),
+                                                                     std::make_pair(s,"s"),
+                                                                     std::make_pair(r,"r"),
+                                                                     std::make_pair(precon,"precon"),
+                                                                     std::make_pair(q,"q")};
+
+  for(auto i: utilityMatrixList)
+      if(i.first == NULL){
+          std::cout<<"Matrix3D "<<i.second<<" not in grid holder; building it...";
+          append(std::unique_ptr<GridTuple>(new GridTuple(i.second,GRID_3D,p->xSize(),p->ySize(),p->zSize())));
+        }
+
+  if(A == NULL){
+      std::cout<<"SevenPointLagrangianMatrix A not in grid holder; building it...";
+    }
+
+  // advect's new (rewritten by body) is project's old, so we need to swap the old and new components of the
+  // TwoStepMatrix3D grids
+  u->swap();
+  v->swap();
+  w->swap();
+  p->swap();
 
   float sigma;
 
   bool breakIteration = true; // flag for whether the result is within tolerance before looping
 
-  for(size_t i=0;i<xSimSize;i++)
-    for(size_t j=0;j<ySimSize;j++)
-      for(size_t k=0;k<zSimSize;k++){
+  size_t xSize;
+  size_t ySize;
+  size_t zSize;
 
-        d[i][j][k] = (u[oldIndex][i][j][k] - u[oldIndex][i+1][j][k] + v[oldIndex][i][j][k] - v[oldIndex][i][j+1][k] + w[oldIndex][i][j][k] - w[oldIndex][i][j][k+1])/2;
-        r[i][j][k] = d[i][j][k];
-        if(abs(r[i][j][k])>tol)
+  xSize = p->xSize();
+  ySize = p->ySize();
+  zSize = p->zSize();
+
+  for(size_t i=0;i<xSize;i++)
+    for(size_t j=0;j<ySize;j++)
+      for(size_t k=0;k<zSize;k++){
+
+        d->set(i, j, k, (u->getOld(i,j,k) - u->getOld(i+1,j,k) + v->getOld(i,j,k) - v->getOld(i,j+1,k) + w->getOld(i,j,k) - w->getOld(i,j,k+1)/2));
+        r->set(i,j,k, d->get(i,j,k));
+        if(abs(r->get(i,j,k))>tol)
           breakIteration = false;
-        p[0][i][j][k] = 0;
+        p->setNew(i,j,k, 0);
   }
+
+  size_t it;
 
   if(breakIteration)
     it = maxIterations + 2; // give it a value that will skip the loop, but also lets us know that maxIterations was not truly exceeded
 
   //first we apply the preconditioner
-  applyPreconditioner(sigma, A, z, d, r, s, precon, q);
+  applyPreconditioner("r",sigma);
 
   // now loop
 
   float maxAbsR, a, b;
-  int it;
 
   for(it=0;it<maxIterations;it++){
 
       maxAbsR = 0;
 
-      applyA(s,z,A);
-      a = rho / dotProduct(z,s);
+      s->apply7PLMatrix(A,z);
+      a = _density / s->dotProduct(z);
 
-      for(int i=0;i<xSimSize;i++)
-        for(int j=0;j<ySimSize;j++)
-          for(int k=0;k<zSimSize;k++){
+      for(size_t i=0;i<xSize;i++)
+        for(size_t j=0;j<ySize;j++)
+          for(size_t k=0;k<zSize;k++){
 
-              p[newIndex][i][j][k] += a * s[i][j][k];
-              r[i][j][k] -= a * z[i][j][k];
+              p->setNew(i,j,k, p->getNew(i,j,k) + a * s->get(i,j,k));
+              r->set(i,j,k,r->get(i,j,k) - a * z->get(i,j,k));
 
-              if(abs(r[i][j][k]) > maxAbsR)
-                maxAbsR = abs(r[i][j][k]);
+              if(abs(r->get(i,j,k)) > maxAbsR)
+                maxAbsR = abs(r->get(i,j,k));
             }
 
       if(maxAbsR <= tol)
         break;
 
-      applyPreconditioner(sigma, A, z, d, r, s, precon, q);
+      applyPreconditioner("r",sigma);
 
-      b = sigma / rho;
+      b = sigma / _density;
 
-      for(int i=0;i<xSimSize;i++)
-        for(int j=0;j<ySimSize;j++)
-          for(int k=0;k<zSimSize;k++)
+      for(size_t i=0;i<xSize;i++)
+        for(size_t j=0;j<ySize;j++)
+          for(size_t k=0;k<zSize;k++)
 
-            s[i][j][k] = z[i][j][k] + b * s[i][j][k];
+            s->set(i,j,k, z->get(i,j,k) + b * s->get(i,j,k));
 
     }
 
   // now compute the new velocities
 
-  for(i=0;i<xSimSize;i++)
-    for(j=0;j<ySimSize;j++)
-      for(k=0;k<zSimSize;k++){
-        u[newIndex][i][j][k] = -dt/rho * (p[newIndex][i+1][j][k] - p[newIndex][i][j][k]) / dx + u[oldIndex][i][j][k];
-        v[newIndex][i][j][k] = -dt/rho * (p[newIndex][i][j+1][k] - p[newIndex][i][j][k]) / dx + v[oldIndex][i][j][k];
-        w[newIndex][i][j][k] = -dt/rho * (p[newIndex][i][j][k+1] - p[newIndex][i][j][k]) / dx + v[oldIndex][i][j][k];
+  for(size_t i=0;i<xSize;i++)
+    for(size_t j=0;j<ySize;j++)
+      for(size_t k=0;k<zSize;k++){
+        u->setNew(i,j,k, -dt/_density * (p->getNew(i+1,j,k) - p->getNew(i,j,k)) / dx + u->getOld(i,j,k));
+        v->setNew(i,j,k, -dt/_density * (p->getNew(i,j+1,k) - p->getNew(i,j,k)) / dx + v->getOld(i,j,k));
+        w->setNew(i,j,k, -dt/_density * (p->getNew(i,j,k+1) - p->getNew(i,j,k)) / dx + v->getOld(i,j,k));
       }
+
+  // swap grids back to prepare for next iteration; this means frames are drawn using the old components
+  u->swap();
+  v->swap();
+  w->swap();
+  p->swap();
 
   if(it < maxIterations || it == maxIterations + 2)
     return true;
@@ -509,7 +651,8 @@ bool OpenGLWindow::project(std::vector<std::vector<std::vector<SevenPointLagrang
 
 bool GridsHolder::applyPreconditioner(std::string targetName, float& sigma){
 
-  applyPreconditioner(targetName, sigma, NULL);
+  std::vector<std::array<std::string,2>> renamedVariables;
+  return applyPreconditioner(targetName, sigma, renamedVariables);
 }
 
 // applies the preconditioner, also does the dotproduct for sigma, so we don't loop the whole grid again
@@ -518,9 +661,74 @@ bool GridsHolder::applyPreconditioner(std::string targetName, float& sigma, std:
 
   float e, t;
 
-  for(size_t i=0;i<xSimSize;i++)
-    for(size_t j=0;j<ySimSize;j++)
-      for(size_t k=0;k<zSimSize;k++){
+  float tau = TAU_TUNING_CONSTANT;
+
+  //these are useless in this function
+  //TwoStepMatrix3D* u = getTwoStepMatrix3DByName("u");
+  //TwoStepMatrix3D* v = getTwoStepMatrix3DByName("v");
+  //TwoStepMatrix3D* w = getTwoStepMatrix3DByName("w");
+  //TwoStepMatrix3D* p = getTwoStepMatrix3DByName("p");
+
+  // this is for checking matrix availability; skip to save time
+  /*
+  bool objectMissing = false;
+
+  if(u==NULL){
+    std::cout<<"Matrix \"u\" is missing from grid holder\n";
+    objectMissing = true;}
+
+  if(v==NULL){
+    std::cout<<"Matrix \"v\" is missing from grid holder\n";
+    objectMissing = true;}
+
+  if(w==NULL){
+    std::cout<<"Matrix \"w\" is missing from grid holder\n";
+    objectMissing = true;}
+
+  if(p==NULL){
+    std::cout<<"Matrix \"p\" is missing from grid holder\n";
+    objectMissing = true;}
+
+  if(objectMissing)
+    return false;
+  */
+
+  Matrix3D* z = getMatrix3DByName("z");
+  //Matrix3D* d = getMatrix3DByName("d");
+  Matrix3D* s = getMatrix3DByName("s");
+  Matrix3D* r = getMatrix3DByName("r");
+  Matrix3D* precon = getMatrix3DByName("precon");
+  Matrix3D* q = getMatrix3DByName("q");
+
+  SevenPointLagrangianMatrix* A = getSevenPointLagrangianMatrixByName("A");
+
+  // this is for checking matrix availability; skip to save time
+  /*
+  std::vector<std::pair<Matrix3D*,std::string>> utilityMatrixList = {std::make_pair(z,"z"),
+                                                                     std::make_pair(d,"d"),
+                                                                     std::make_pair(s,"s"),
+                                                                     std::make_pair(r,"r"),
+                                                                     std::make_pair(precon,"precon"),
+                                                                     std::make_pair(q,"q")};
+
+  for(auto i: utilityMatrixList)
+      if(i.first == NULL){
+          std::cout<<"Matrix3D "<<i.second<<" not in grid holder; building it...";
+          append(std::unique_ptr<GridTuple>(new GridTuple(i.second,GRID_3D,p->xSize(),p->ySize(),p->zSize())));
+        }
+
+  if(A == NULL){
+      std::cout<<"SevenPointLagrangianMatrix A not in grid holder; building it...";
+    }
+  */
+
+  size_t xSize = A->xSize();
+  size_t ySize = A->ySize();
+  size_t zSize = A->zSize();
+
+  for(size_t i=0;i<xSize;i++)
+    for(size_t j=0;j<ySize;j++)
+      for(size_t k=0;k<zSize;k++){
 
           //THIS ISN'T GOING TO WORK BECAUSE YOU SET P TO ZERO
           //if(p[i][j][k] == 0) // if there is no fluid in this cell, skip it
@@ -528,47 +736,113 @@ bool GridsHolder::applyPreconditioner(std::string targetName, float& sigma, std:
 
           // apply preconditioner (is the i,j or k = 0 limit behaviour correct?)
 
-          e = A[i][j][k].diag;
+          e = A->get(i,j,k).diag;
           if(i>0)
-            e-= pow((A[i-1][j][k].iUp * r[i-1][j][k]),2) + tau * (A[i-1][j][k].iUp * (A[i-1][j][k].jUp + A[i-1][j][k].kUp)) * pow(precon[i-1][j][k],2);
+            e-= pow((A->get(i-1,j,k).iUp * r->get(i-1,j,k)),2) + tau * (A->get(i-1,j,k).iUp * (A->get(i-1,j,k).jUp + A->get(i-1,j,k).kUp)) * pow(precon->get(i-1,j,k),2);
           if(j>0)
-            e-= pow((A[i][j-1][k].jUp * r[i][j-1][k]),2) + tau * (A[i][j-1][k].jUp * (A[i][j-1][k].iUp + A[i][j-1][k].kUp)) * pow(precon[i][j-1][k],2);
+            e-= pow((A->get(i,j-1,k).jUp * r->get(i,j-1,k)),2) + tau * (A->get(i,j-1,k).jUp * (A->get(i,j-1,k).iUp + A->get(i,j-1,k).kUp)) * pow(precon->get(i,j-1,k),2);
           if(k>0)
-            e-= pow((A[i][j][k-1].iUp * r[i][j][k-1]),2) + tau * (A[i][j][k-1].iUp * (A[i][j][k-1].jUp + A[i][j][k-1].kUp)) * pow(precon[i][j][k-1],2);
+            e-= pow((A->get(i,j,k-1).iUp * r->get(i,j,k-1)),2) + tau * (A->get(i,j,k-1).iUp * (A->get(i,j,k-1).jUp + A->get(i,j,k-1).kUp)) * pow(precon->get(i,j,k-1),2);
 
-          precon[i][j][k] = 1.0/sqrt(e+1E-30);
+          precon->set(i,j,k, 1.0/sqrt(e+1E-30)); // small offset to protect from divide by zero
 
-          t = r[i][j][k];
+          t = r->get(i,j,k);
           if(i>0)
-            t-= A[i-1][j][k].iUp * precon[i-1][j][k] * q[i-1][j][k];
+            t-= A->get(i-1,j,k).iUp * precon->get(i-1,j,k) * q->get(i-1,j,k);
           if(j>0)
-            t-= A[i][j-1][k].iUp * precon[i][j-1][k] * q[i][j-1][k];
+            t-= A->get(i,j-1,k).iUp * precon->get(i,j-1,k) * q->get(i,j-1,k);
           if(k>0)
-            t-= A[i][j][k-1].iUp * precon[i][j][k-1] * q[i][j][k-1];
+            t-= A->get(i,j,k-1).iUp * precon->get(i,j,k-1) * q->get(i,j,k-1);
 
-          q[i][j][k] = t * precon[i][j][k];
+          q->set(i,j,k, t * precon->get(i,j,k));
         }
 
   sigma = 0;
 
-  for(int i=xSimSize-1;i>=0;i--)
-    for(int j=ySimSize-1;j>=0;j--)
-      for(int k=zSimSize-1;k>=0;k--){
+  for(size_t i=xSize;i>0;--i)
+    for(size_t j=ySize;j>0;--j)
+      for(size_t k=zSize;k>0;--k){
 
-          t = q[i][j][k];
-          if(i<xSimSize)
-            t-= A[i][j][k].iUp * precon[i][j][k] * z[i+1][j][k];
-          if(j<ySimSize)
-            t-= A[i][j][k].jUp * precon[i][j][k] * z[i][j+1][k];
-          if(k<zSimSize)
-            t-= A[i][j][k].kUp * precon[i][j][k] * z[i][j][k+1];
+          t = q->get(i,j,k);
+          if(i<xSize)
+            t-= A->get(i,j,k).iUp * precon->get(i,j,k) * z->get(i+1,j,k);
+          if(j<ySize)
+            t-= A->get(i,j,k).jUp * precon->get(i,j,k) * z->get(i,j+1,k);
+          if(k<zSize)
+            t-= A->get(i,j,k).kUp * precon->get(i,j,k) * z->get(i,j,k+1);
 
-          z[i][j][k] = t * precon[i][j][k];
+          z->set(i,j,k, t * precon->get(i,j,k));
 
           // s is the search vector
-          s[i][j][k] = z[i][j][k];
+          s->set(i,j,k, z->get(i,j,k));
 
           // set sigma as the dot product of z and r
-          sigma += z[i][j][k] * r[i][j][k];
+          sigma += z->get(i,j,k) * r->get(i,j,k);
         }
+
+  return true;
+}
+
+bool GridsHolder::body(){
+
+  return body(default_dt);
+}
+
+bool GridsHolder::body(float dt){
+
+  TwoStepMatrix3D* u = getTwoStepMatrix3DByName("u");
+  TwoStepMatrix3D* v = getTwoStepMatrix3DByName("v");
+  TwoStepMatrix3D* w = getTwoStepMatrix3DByName("w");
+  //TwoStepMatrix3D* p = getTwoStepMatrix3DByName("p");
+
+  // this is for checking matrix availability; skip to dave time
+  /*
+  bool objectMissing = false;
+
+  if(u==NULL){
+    std::cout<<"Matrix \"u\" is missing from grid holder\n";
+    objectMissing = true;}
+
+  if(v==NULL){
+    std::cout<<"Matrix \"v\" is missing from grid holder\n";
+    objectMissing = true;}
+
+  if(w==NULL){
+    std::cout<<"Matrix \"w\" is missing from grid holder\n";
+    objectMissing = true;}
+
+  if(p==NULL){
+    std::cout<<"Matrix \"p\" is missing from grid holder\n";
+    objectMissing = true;}
+
+  if(objectMissing)
+    return false;
+  */
+
+  size_t xSize = u->xSize() - 1;
+  size_t ySize = u->ySize();
+  size_t zSize = u->zSize();
+
+  for(size_t i=0;i<=xSize;i++)
+    for(size_t j=0;j<=ySize;j++)
+      for(size_t k=0;k<=zSize;k++){
+
+          if(i==xSize){
+              u->setNew(i,j,k, u->getNew(i,j,k) + _g.m_x * dt);
+              continue;}
+          else
+            if(j==ySize){
+                v->setNew(i,j,k, v->getNew(i,j,k) + _g.m_y * dt);
+                continue;}
+            else
+              if(k==zSize){
+                  w->setNew(i,j,k, w->getNew(i,j,k) + _g.m_z * dt);
+                  continue;}
+
+          u->setNew(i,j,k, u->getNew(i,j,k) + _g.m_x * dt);
+          v->setNew(i,j,k, v->getNew(i,j,k) + _g.m_y * dt);
+          w->setNew(i,j,k, w->getNew(i,j,k) + _g.m_z * dt);
+        }
+
+  return true;
 }
