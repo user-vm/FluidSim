@@ -37,8 +37,8 @@ void OpenGLWindow::initializeGL()
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_MULTISAMPLE);
 
-  makeCubes(cubeSize);
   bake();
+  makeCubes(cubeSize);
 }
 
 void  OpenGLWindow::makeCubes( GLfloat _size)
@@ -47,9 +47,14 @@ void  OpenGLWindow::makeCubes( GLfloat _size)
   // as we are doing lines it will be 2 verts per line
   // and we need to add 1 to each of them for the <= loop
   // and finally muliply by 12 as we have 12 values per line pair
-  qint64 kVertex=-1, kNormal=-1, kColor = -1;
   m_cubeSubVBOSize=3*3*2*6*3;//3 coordinates per vertex, 3 vertices per tri, 2 tris per quad, 6 quads per cube, 3 data types (vertex, normal, colour)
   m_vboSize= (m_cubeSubVBOSize*xSimSize*ySimSize*zSimSize*10)/3;
+
+  // all vertex position data, all normal data, all color data
+  m_normalOffset = (3*2*6*3)*3*xSimSize*ySimSize*zSimSize;
+  m_colorOffset = (3*2*6*3)*6*xSimSize*ySimSize*zSimSize;
+
+  qint64 kVertex=-1, kNormal=m_normalOffset-1, kColor = m_colorOffset-1;
 
   std::unique_ptr<GLfloat []>vertexData( new GLfloat[m_vboSize]);
 
@@ -141,7 +146,7 @@ void  OpenGLWindow::makeCubes( GLfloat _size)
                 vertexData[++kColor]=0.5 + d3*0.5/zSimSize;// + verts[i+t].m_z;
                 vertexData[++kColor]=0.5;
 
-                std::cout<<vertexData[k]<<"\n";
+                //std::cout<<vertexData[k]<<"\n";
 
               }
 
@@ -162,10 +167,6 @@ void  OpenGLWindow::makeCubes( GLfloat _size)
   // then the pointer to the actual data
   // Then how we are going to draw it (in this case Statically as the data will not change)
   glBufferData(GL_ARRAY_BUFFER, m_vboSize*sizeof(GL_FLOAT) , vertexData.get(), GL_DYNAMIC_DRAW);
-  glBufferSubData();
-
-  startTimer(100);
-  timer.start();
 
 }
 
@@ -182,21 +183,21 @@ void OpenGLWindow::paintGL()
   glEnableClientState(GL_NORMAL_ARRAY);
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-  //glEnableClientState(GL_POLYGON_STIPPLE); //<- consider using if glBlend doesn't work right
+  glEnableClientState(GL_POLYGON_STIPPLE); //<- consider using if glBlend doesn't work right
   // bind our VBO data to be the currently active one
 
   //glUseProgram(shaderProgramID);
 
-  glVertexPointer(3,GL_FLOAT,10*sizeof(GL_FLOAT),(void*)0); //SET THE STRIDE
-  glNormalPointer(GL_FLOAT,10*sizeof(GL_FLOAT),(void*)(3*sizeof(GL_FLOAT)));
-  glColorPointer(4,GL_FLOAT,10*sizeof(GL_FLOAT),(void*)(6*sizeof(GL_FLOAT)));
+  glVertexPointer(3,GL_FLOAT,0,(void*)0);
+  glNormalPointer(GL_FLOAT,0,(void*)(m_normalOffset*sizeof(GL_FLOAT)));
+  glColorPointer(4,GL_FLOAT,0,(void*)(m_colorOffset*sizeof(GL_FLOAT)));
 
   //glPolygonStipple();
 
   glPushMatrix();
   glRotatef(360.0* (m_spin?(timer.elapsed()/5000.0):1),0.0,1.0,0.0);  //* timer.elapsed()/5000
   glRotatef(45.0,-0.4,1.0,0.0);
-  glDrawArrays(GL_TRIANGLES, 0, xSimSize*ySimSize*zSimSize*m_cubeSubVBOSize*10);
+  glDrawArrays(GL_TRIANGLES, 0, m_vboSize/3);
   glPopMatrix();
   // now turn off the VBO client state as we have finished with it
   glDisableClientState(GL_NORMAL_ARRAY);
@@ -206,6 +207,11 @@ void OpenGLWindow::paintGL()
 
 void OpenGLWindow::timerEvent(QTimerEvent *)
 {
+  update();
+  return;
+  int frameOffset = int(timer.elapsed()/frameDuration) % pressureFrameData->numFrames();
+  glBufferSubData(GL_ARRAY_BUFFER,(GLintptr)(pressureFrameData->frameSize()*frameOffset*sizeof(float)),
+                  pressureFrameData->frameSize(),pressureColorData.get());
   update();
 }
 
@@ -299,21 +305,33 @@ void OpenGLWindow::bake(){
   float simTime = 0.0;
 
   // need to initialize matrices
+/*
+  std::vector<std::unique_ptr<GridTuple>> gridsToMake = {std::unique_ptr<GridTuple>(new GridTuple("u",GRID_3D_TWOSTEP,xSimSize+1,ySimSize,zSimSize)),
+                                         std::unique_ptr<GridTuple>(new GridTuple("v",GRID_3D_TWOSTEP,xSimSize,ySimSize+1,zSimSize)),
+                                         std::unique_ptr<GridTuple>(new GridTuple("w",GRID_3D_TWOSTEP,xSimSize,ySimSize,zSimSize+1)),
+                                         std::unique_ptr<GridTuple>(new GridTuple("p",GRID_3D_TWOSTEP,xSimSize,ySimSize,zSimSize)),
+                                         std::unique_ptr<GridTuple>(new GridTuple("r",GRID_3D,xSimSize,ySimSize,zSimSize)),
+                                         std::unique_ptr<GridTuple>(new GridTuple("z",GRID_3D,xSimSize,ySimSize,zSimSize)),
+                                         std::unique_ptr<GridTuple>(new GridTuple("s",GRID_3D,xSimSize,ySimSize,zSimSize)),
+                                         std::unique_ptr<GridTuple>(new GridTuple("d",GRID_3D,xSimSize,ySimSize,zSimSize)),
+                                         std::unique_ptr<GridTuple>(new GridTuple("precon",GRID_3D,xSimSize,ySimSize,zSimSize)),
+                                         std::unique_ptr<GridTuple>(new GridTuple("q",GRID_3D,xSimSize,ySimSize,zSimSize))};
+*/
 
-  std::vector<GridTuple*> gridsToMake = {new GridTuple("u",GRID_3D_TWOSTEP,xSimSize+1,ySimSize,zSimSize),
-                                         new GridTuple("v",GRID_3D_TWOSTEP,xSimSize,ySimSize+1,zSimSize),
-                                         new GridTuple("w",GRID_3D_TWOSTEP,xSimSize,ySimSize,zSimSize+1),
-                                         new GridTuple("p",GRID_3D_TWOSTEP,xSimSize,ySimSize,zSimSize),
-                                         new GridTuple("r",GRID_3D,xSimSize,ySimSize,zSimSize),
-                                         new GridTuple("z",GRID_3D,xSimSize,ySimSize,zSimSize),
-                                         new GridTuple("s",GRID_3D,xSimSize,ySimSize,zSimSize),
-                                         new GridTuple("d",GRID_3D,xSimSize,ySimSize,zSimSize),
-                                         new GridTuple("precon",GRID_3D,xSimSize,ySimSize,zSimSize),
-                                         new GridTuple("q",GRID_3D,xSimSize,ySimSize,zSimSize)};
+  std::vector<std::unique_ptr<GridTuple>> gridsToMake;
 
+  gridsToMake.push_back(std::unique_ptr<GridTuple>(new GridTuple("u",GRID_3D_TWOSTEP,xSimSize+1,ySimSize,zSimSize)));
+  gridsToMake.push_back(std::unique_ptr<GridTuple>(new GridTuple("v",GRID_3D_TWOSTEP,xSimSize,ySimSize+1,zSimSize)));
+  gridsToMake.push_back(std::unique_ptr<GridTuple>(new GridTuple("w",GRID_3D_TWOSTEP,xSimSize,ySimSize,zSimSize+1)));
+  gridsToMake.push_back(std::unique_ptr<GridTuple>(new GridTuple("p",GRID_3D_TWOSTEP,xSimSize,ySimSize,zSimSize)));
+  gridsToMake.push_back(std::unique_ptr<GridTuple>(new GridTuple("r",GRID_3D,xSimSize,ySimSize,zSimSize)));
+  gridsToMake.push_back(std::unique_ptr<GridTuple>(new GridTuple("z",GRID_3D,xSimSize,ySimSize,zSimSize)));
+  gridsToMake.push_back(std::unique_ptr<GridTuple>(new GridTuple("s",GRID_3D,xSimSize,ySimSize,zSimSize)));
+  gridsToMake.push_back(std::unique_ptr<GridTuple>(new GridTuple("d",GRID_3D,xSimSize,ySimSize,zSimSize)));
+  gridsToMake.push_back(std::unique_ptr<GridTuple>(new GridTuple("precon",GRID_3D,xSimSize,ySimSize,zSimSize)));
+  gridsToMake.push_back(std::unique_ptr<GridTuple>(new GridTuple("q",GRID_3D,xSimSize,ySimSize,zSimSize)));
 
-  std::unique_ptr<GridsHolder> grids(new GridsHolder(gridsToMake,
-                                                     dx, dt, tol, maxIterations, rho, g));
+  std::unique_ptr<GridsHolder> grids = std::unique_ptr<GridsHolder>(new GridsHolder(std::move(gridsToMake), dx, dt, tol, maxIterations, rho, g));
 
   //addPressureFrameData();
   //addVelocityFrameData();
@@ -368,7 +386,15 @@ void OpenGLWindow::bake(){
       tempDt = dt;
     }
 
+  pressureColorData = pressureFrameData->dataToGLfloat();
+  uColorData = uFrameData->dataToGLfloat();
+  vColorData = vFrameData->dataToGLfloat();
+  wColorData = wFrameData->dataToGLfloat();
+
   std::cout<<"Finished bake.\n";
+
+  startTimer(frameDuration);
+  timer.start();
 }
 
 size_t OpenGLWindow::FrameData::xSize(){
@@ -487,4 +513,18 @@ OpenGLWindow::FrameData::FrameData(size_t xSize, size_t ySize, size_t zSize){
   y_Size = ySize;
   z_Size = zSize;
   num_Frames = 0;
+}
+
+size_t OpenGLWindow::FrameData::frameSize(){
+
+  return x_Size * y_Size * z_Size;
+}
+
+std::unique_ptr<GLfloat[]> OpenGLWindow::FrameData::dataToGLfloat(){
+
+  return std::unique_ptr<GLfloat[]>(data.data());
+}
+
+size_t OpenGLWindow::FrameData::numFrames(){
+  return num_Frames;
 }

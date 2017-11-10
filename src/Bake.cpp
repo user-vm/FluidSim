@@ -272,32 +272,32 @@ GridTuple::GridTuple(std::string gridName, GridType gridType, size_t x, size_t y
 
 // GridsHolder functions
 
-GridsHolder::GridsHolder(std::vector<GridTuple*> listOfGrids, float gridCellSize, float timeStep,
+GridsHolder::GridsHolder(std::vector<std::unique_ptr<GridTuple> > listOfGrids, float gridCellSize, float timeStep,
                          float projectionTolerance, size_t maxIterations, float density, ngl::Vec3 g){
 
   // custom lambda compare function; list gets sorted alphabetically
-  std::sort(listOfGrids.begin(),listOfGrids.end(), [](GridTuple* a, GridTuple* b){
+  std::sort(listOfGrids.begin(),listOfGrids.end(), [](const std::unique_ptr<GridTuple> &a, const std::unique_ptr<GridTuple> &b){
     return a->_gridName < b->_gridName;} );
 
-  for(auto i: listOfGrids){
+  for(size_t i=0;i<listOfGrids.size();i++){
 
       // if a duplicate element name is hit, skip it
-      if(!_gridNames.empty() && i->_gridName == _gridNames.back()){
-          std::cout<<"Skipping grid \""<<i->_gridName<<"\" of type "<<(i->_gridType?((i->_gridType==1)\
+      if(!_gridNames.empty() && listOfGrids[i]->_gridName == _gridNames.back()){
+          std::cout<<"Skipping grid \""<<listOfGrids[i]->_gridName<<"\" of type "<<(listOfGrids[i]->_gridType?((listOfGrids[i]->_gridType==1)\
                      ?"TwoStepMatrix3D":"SevenPointLagrangianMatrix"):"Matrix3D")<<" with duplicate name\n";
           continue;}
 
-      switch(i->_gridType){
+      switch(listOfGrids[i]->_gridType){
 
-        case GRID_3D:         {_grids.push_back(GridElement(new Matrix3D(i->_x,i->_y,i->_z))); break;}
-        case GRID_3D_7PL:     {_grids.push_back(GridElement(new SevenPointLagrangianMatrix(i->_x,i->_y,i->_z, true))); break;}
-        case GRID_3D_TWOSTEP: {_grids.push_back(GridElement(new TwoStepMatrix3D(i->_x,i->_y,i->_z))); break;}
+        case GRID_3D:         {_grids.push_back(GridElement(new Matrix3D(listOfGrids[i]->_x,listOfGrids[i]->_y,listOfGrids[i]->_z))); break;}
+        case GRID_3D_7PL:     {_grids.push_back(GridElement(new SevenPointLagrangianMatrix(listOfGrids[i]->_x,listOfGrids[i]->_y,listOfGrids[i]->_z, true))); break;}
+        case GRID_3D_TWOSTEP: {_grids.push_back(GridElement(new TwoStepMatrix3D(listOfGrids[i]->_x,listOfGrids[i]->_y,listOfGrids[i]->_z))); break;}
         default:              continue;
         }
 
-      _gridNames.push_back(i->_gridName);
-      _gridTypes.push_back(i->_gridType);
-      _outsideValues.push_back(i->_outsideValue);
+      _gridNames.push_back(listOfGrids[i]->_gridName);
+      _gridTypes.push_back(listOfGrids[i]->_gridType);
+      _outsideValues.push_back(listOfGrids[i]->_outsideValue);
 
     }
 
@@ -310,7 +310,7 @@ GridsHolder::GridsHolder(std::vector<GridTuple*> listOfGrids, float gridCellSize
 
 }
 
-GridsHolder::~GridsHolder(){}
+//GridsHolder::~GridsHolder(){}
 
 size_t GridsHolder::size(){
   return _gridNames.size();
@@ -979,6 +979,7 @@ bool GridsHolder::append(GridTuple gridTuple){
   _gridTypes.push_back(gridTuple._gridType);
   _outsideValues.push_back(gridTuple._outsideValue);
 
+  return true;
 }
 
 bool GridsHolder::append(std::vector<std::unique_ptr<GridTuple>> listOfGrids){

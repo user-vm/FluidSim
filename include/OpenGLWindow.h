@@ -162,7 +162,16 @@ class OpenGLWindow : public QOpenGLWindow
     //----------------------------------------------------------------------------------------------------------------------
     float dx;
 
+    size_t m_normalOffset;
+
+    size_t m_colorOffset;
+
     //typedef std::vector<std::vector<std::vector<std::vector<float>>>> Matrix4D;
+
+    std::unique_ptr<GLfloat[]> pressureColorData;
+    std::unique_ptr<GLfloat[]> uColorData;
+    std::unique_ptr<GLfloat[]> vColorData;
+    std::unique_ptr<GLfloat[]> wColorData;
 
     // something that can be fed into the shader
     class FrameData{
@@ -176,6 +185,8 @@ class OpenGLWindow : public QOpenGLWindow
       size_t zSize();
       size_t numFrames();
 
+      size_t frameSize();
+
       // frame number start from zero
       bool set(size_t x, size_t y, size_t z,size_t frame,float value);
       float get(size_t x, size_t y, size_t z,size_t frame);
@@ -186,6 +197,7 @@ class OpenGLWindow : public QOpenGLWindow
       bool addFrame(GridsHolder* gridsHolder, std::string gridName);
       bool addFrame(GridsHolder* gridsHolder, std::string gridName, size_t index);
 
+      std::unique_ptr<GLfloat[]> dataToGLfloat();
 
     private:
       std::vector<float> data;

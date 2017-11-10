@@ -174,10 +174,10 @@ private:
 class GridsHolder{
 
 public:
-  GridsHolder(std::vector<GridTuple*> listOfGrids, float gridCellSize, float timeStep,
+  GridsHolder(std::vector<std::unique_ptr<GridTuple>> listOfGrids, float gridCellSize, float timeStep,
               float projectionTolerance, size_t maxIterations,
               float density, ngl::Vec3 g);
-  ~GridsHolder();
+  //~GridsHolder();
 
   bool append(std::vector<GridTuple> listOfGrids);
 
