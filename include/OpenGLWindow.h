@@ -126,7 +126,7 @@ class OpenGLWindow : public QOpenGLWindow
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief the frame duration (1/framerate)
     //----------------------------------------------------------------------------------------------------------------------
-    float frameDuration;
+    float frameDuration = 1.0 / 25.0;
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief the current simulation time
     //----------------------------------------------------------------------------------------------------------------------
@@ -134,7 +134,7 @@ class OpenGLWindow : public QOpenGLWindow
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief the total time to simulate
     //----------------------------------------------------------------------------------------------------------------------
-    float totalSimTime=0.0;
+    float totalSimTime=5.0;
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief the default gravitational acceleration
     //----------------------------------------------------------------------------------------------------------------------
@@ -162,42 +162,52 @@ class OpenGLWindow : public QOpenGLWindow
     //----------------------------------------------------------------------------------------------------------------------
     float dx;
 
-    typedef std::vector<std::vector<std::vector<std::vector<float>>>> Matrix4D;
+    //typedef std::vector<std::vector<std::vector<std::vector<float>>>> Matrix4D;
 
-    //----------------------------------------------------------------------------------------------------------------------
-    /// @brief data holding pressure of each cell at each frame
-    //----------------------------------------------------------------------------------------------------------------------
-    Matrix4D pressureFrameData;
-
-    //----------------------------------------------------------------------------------------------------------------------
-    /// @brief data holding velocity of each cell wall at each frame
-    //----------------------------------------------------------------------------------------------------------------------
-    Matrix4D uFrameData;
-    Matrix4D vFrameData;
-    Matrix4D wFrameData;
-
+    // something that can be fed into the shader
     class FrameData{
 
     public:
-      FrameData(xSize, ySize, zSize);
-      ~FrameData();
+      FrameData(size_t xSize, size_t ySize, size_t zSize);
+      //~FrameData();
 
       size_t xSize();
       size_t ySize();
       size_t zSize();
       size_t numFrames();
 
-    private:
-      bool addFrame(GridsHolder gridsHolder, std::string gridName);
-      bool addFrame(GridsHolder gridsHolder, std::string gridName, size_t index);
+      // frame number start from zero
+      bool set(size_t x, size_t y, size_t z,size_t frame,float value);
+      float get(size_t x, size_t y, size_t z,size_t frame);
 
+      bool setFrame();
+      //getFrame(); -> shared pointer?
+
+      bool addFrame(GridsHolder* gridsHolder, std::string gridName);
+      bool addFrame(GridsHolder* gridsHolder, std::string gridName, size_t index);
+
+
+    private:
       std::vector<float> data;
+      std::string _name; // optional; default is "unnamed"
       size_t x_Size;
       size_t y_Size;
       size_t z_Size;
       size_t num_Frames;
 
     };
+
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief data holding pressure of each cell at each frame
+    //----------------------------------------------------------------------------------------------------------------------
+    std::unique_ptr<FrameData> pressureFrameData;
+
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief data holding velocity of each cell wall at each frame
+    //----------------------------------------------------------------------------------------------------------------------
+    std::unique_ptr<FrameData> uFrameData;
+    std::unique_ptr<FrameData> vFrameData;
+    std::unique_ptr<FrameData> wFrameData;
 };
 
 #endif

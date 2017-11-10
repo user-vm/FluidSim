@@ -218,26 +218,71 @@ void OpenGLWindow::resizeGL(int _w, int _h)
   m_xOffset = (_w - m_width)/2;
   m_yOffset = (_h - m_height) / 2;
 }
+/*
+void OpenGLWindow::addPressureFrameData(GridsHolder grids){
 
-void OpenGLWindow::addPressureFrameData(){
+  pressureFrameData.resize(pressureFrameData.size() + x_Size*y_Size*z_Size);
 
-  pressureFrameData.resize
 }
 
 void OpenGLWindow::addVelocityFrameData(){
 
 }
-
+*/
 void OpenGLWindow::initializePressure(GridsHolder *gridsHolder){
 
   // here we will populate the pressure grid with its initial values
-  // nothing here at the moment, so grid will be all zeroes
+
+  TwoStepMatrix3D* p = gridsHolder->getTwoStepMatrix3DByName("p");
+
+  size_t x_Size = p->xSize();
+  size_t y_Size = p->ySize();
+  size_t z_Size = p->zSize();
+
+  for(size_t i=0;i<x_Size;i++)
+    for(size_t j=0;j<y_Size;j++)
+      for(size_t k=0;k<z_Size;k++)
+
+        p->setOld(i,j,k,std::fabs(((x_Size*1.0)/2.0-i)/x_Size));
 }
 
 void OpenGLWindow::initializeVelocity(GridsHolder *gridsHolder){
 
   // here we will populate the velocity grids with their initial values
-  // nothing here at the moment, so grids will be all zeroes
+  TwoStepMatrix3D* u = gridsHolder->getTwoStepMatrix3DByName("u");
+  TwoStepMatrix3D* v = gridsHolder->getTwoStepMatrix3DByName("v");
+  TwoStepMatrix3D* w = gridsHolder->getTwoStepMatrix3DByName("w");
+
+  size_t x_Size = u->xSize();
+  size_t y_Size = u->ySize();
+  size_t z_Size = u->zSize();
+
+  for(size_t i=0;i<x_Size;i++)
+    for(size_t j=0;j<y_Size;j++)
+      for(size_t k=0;k<z_Size;k++)
+
+        u->setOld(i,j,k,std::fabs(((x_Size*1.0)/2.0-i)/x_Size));
+
+  x_Size = v->xSize();
+  y_Size = v->ySize();
+  z_Size = v->zSize();
+
+  for(size_t i=0;i<x_Size;i++)
+    for(size_t j=0;j<y_Size;j++)
+      for(size_t k=0;k<z_Size;k++)
+
+        v->setOld(i,j,k,std::fabs(((y_Size*1.0)/2.0-j)/y_Size));
+
+  x_Size = u->xSize();
+  y_Size = u->ySize();
+  z_Size = u->zSize();
+
+  for(size_t i=0;i<x_Size;i++)
+    for(size_t j=0;j<y_Size;j++)
+      for(size_t k=0;k<z_Size;k++)
+
+        w->setOld(i,j,k,std::fabs(((z_Size*1.0)/2.0-k)/z_Size));
+
 }
 
 void OpenGLWindow::bake(){
@@ -248,49 +293,75 @@ void OpenGLWindow::bake(){
 
   // need to initialize matrices
 
-  std::vector<GridTuple> gridsToMake = {GridTuple("u",GRID_3D_TWOSTEP,xSimSize+1,ySimSize,zSimSize),
-                                         GridTuple("v",GRID_3D_TWOSTEP,xSimSize,ySimSize+1,zSimSize),
-                                         GridTuple("w",GRID_3D_TWOSTEP,xSimSize,ySimSize,zSimSize+1),
-                                         GridTuple("p",GRID_3D,xSimSize,ySimSize,zSimSize),
-                                         GridTuple("r",GRID_3D,xSimSize,ySimSize,zSimSize),
-                                         GridTuple("z",GRID_3D,xSimSize,ySimSize,zSimSize),
-                                         GridTuple("s",GRID_3D,xSimSize,ySimSize,zSimSize),
-                                         GridTuple("d",GRID_3D,xSimSize,ySimSize,zSimSize),
-                                         GridTuple("precon",GRID_3D,xSimSize,ySimSize,zSimSize),
-                                         GridTuple("q",GRID_3D,xSimSize,ySimSize,zSimSize)};
+  std::vector<GridTuple*> gridsToMake = {new GridTuple("u",GRID_3D_TWOSTEP,xSimSize+1,ySimSize,zSimSize),
+                                         new GridTuple("v",GRID_3D_TWOSTEP,xSimSize,ySimSize+1,zSimSize),
+                                         new GridTuple("w",GRID_3D_TWOSTEP,xSimSize,ySimSize,zSimSize+1),
+                                         new GridTuple("p",GRID_3D_TWOSTEP,xSimSize,ySimSize,zSimSize),
+                                         new GridTuple("r",GRID_3D,xSimSize,ySimSize,zSimSize),
+                                         new GridTuple("z",GRID_3D,xSimSize,ySimSize,zSimSize),
+                                         new GridTuple("s",GRID_3D,xSimSize,ySimSize,zSimSize),
+                                         new GridTuple("d",GRID_3D,xSimSize,ySimSize,zSimSize),
+                                         new GridTuple("precon",GRID_3D,xSimSize,ySimSize,zSimSize),
+                                         new GridTuple("q",GRID_3D,xSimSize,ySimSize,zSimSize)};
 
 
   std::unique_ptr<GridsHolder> grids(new GridsHolder(gridsToMake,
                                                      dx, dt, tol, maxIterations, rho, g));
 
-  addPressureFrameData();
-  addVelocityFrameData();
+  //addPressureFrameData();
+  //addVelocityFrameData();
   size_t currentFrame = 0;
 
   initializePressure(grids.get());
   initializeVelocity(grids.get());
 
+  pressureFrameData = std::unique_ptr<FrameData>(new FrameData(xSimSize,ySimSize,zSimSize));
+  uFrameData = std::unique_ptr<FrameData>(new FrameData(xSimSize+1,ySimSize,zSimSize));
+  vFrameData = std::unique_ptr<FrameData>(new FrameData(xSimSize,ySimSize+1,zSimSize));
+  wFrameData = std::unique_ptr<FrameData>(new FrameData(xSimSize,ySimSize,zSimSize+1));
+
+  pressureFrameData->addFrame(grids.get(),"p");
+  uFrameData->addFrame(grids.get(),"u");
+  vFrameData->addFrame(grids.get(),"v");
+  wFrameData->addFrame(grids.get(),"w");
+
+  float tempDt = dt;
+
   // prepare A matrix; since walls are not implemented yet, all diag values will be 6, and all other values will be -1, except at the (xSimSize-1, ySimSize-1, zSimSize-1) corner
 
   while(simTime<=totalSimTime-dt){
 
+      bool makeFrame = false;
+
+      if(size_t((simTime + dt)/frameDuration) > currentFrame){
+          makeFrame = true;
+          tempDt = (currentFrame + 1) * frameDuration - simTime;
+        }
+
       // only need information for two consectutive time steps
       // ADVECT RUNS WITH [0] AS OLD, BODY REWRITES [1], PROJECT RUNS WITH [1] AS OLD, REPEAT
-      grids.get()->advect({"u","v","w","p"});
+      grids.get()->advectDummy({"u","v","w","p"}, tempDt);
 
       // body function is just updating the velocities to account for gravity
-      grids.get()->body();
+      grids.get()->bodyDummy(tempDt);
 
+      grids.get()->projectDummy(tempDt);
+      simTime += tempDt;
 
-      grids.get()->project();
-      simTime += dt;
+      if(makeFrame){
+          pressureFrameData->addFrame(grids.get(),"p");
+          uFrameData->addFrame(grids.get(),"u");
+          vFrameData->addFrame(grids.get(),"v");
+          wFrameData->addFrame(grids.get(),"w");
 
-      if(fmod(simTime,dt) >= currentFrame){
-          addPressureFrameData();
-          addVelocityFrameData();
           currentFrame++;
+          std::cout<<currentFrame<<"/"<<totalSimTime/frameDuration<<"\n";
         }
+
+      tempDt = dt;
     }
+
+  std::cout<<"Finished bake.\n";
 }
 
 size_t OpenGLWindow::FrameData::xSize(){
@@ -308,16 +379,105 @@ size_t OpenGLWindow::FrameData::zSize(){
   return z_Size;
 }
 
-bool OpenGLWindow::FrameData::addFrame(GridsHolder gridsHolder, std::string gridName){
+bool OpenGLWindow::FrameData::addFrame(GridsHolder* gridsHolder, std::string gridName){
 
   return addFrame(gridsHolder, gridName, num_Frames);
 }
 
-bool OpenGLWindow::FrameData::addFrame(GridsHolder gridsHolder, std::string gridName, size_t atFrame){
+bool OpenGLWindow::FrameData::addFrame(GridsHolder* gridsHolder, std::string gridName, size_t atFrame){
 
-  if(atFrame > num_Frames)
-    return false;
+  if(atFrame > num_Frames){
+      std::cout<<"Index of frame to add is not in scope of FrameData object \""<<_name<<"\"";
+    return false;}
 
   // grid data saves onyl two timesteps; that's why you need to copy them
   // consider file caching in the future? (whatever that means)
+
+  bool doSizesMatch = true;
+
+  GridType gridType = gridsHolder->getTypeByName(gridName);
+
+  //gridsHolder.getAnyByName();
+
+  if(gridType == GRID_3D){
+      Matrix3D* grid = gridsHolder->getMatrix3DByName(gridName);
+
+      if(grid->xSize() != x_Size){
+          std::cout<<"X-dimensions of FrameData object \""<<_name<<"\" and grid object \""<<gridName<<"\" do not match.\n";
+          doSizesMatch = false;
+        }
+
+      if(grid->ySize() != y_Size){
+          std::cout<<"Y-dimensions of FrameData object \""<<_name<<"\" and grid object \""<<gridName<<"\" do not match.\n";
+          doSizesMatch = false;
+        }
+
+      if(grid->zSize() != z_Size){
+          std::cout<<"Z-dimensions of FrameData object \""<<_name<<"\" and grid object \""<<gridName<<"\" do not match.\n";
+          doSizesMatch = false;
+        }
+
+      if(!doSizesMatch)
+        return false;
+
+      data.resize(data.size() + x_Size*y_Size*z_Size);
+
+      size_t pos = atFrame * x_Size * y_Size * z_Size;
+
+      for(size_t i=0;i<x_Size;i++)
+        for(size_t j=0;j<y_Size;j++)
+          for(size_t k=0;k<z_Size;k++,pos++)
+
+            data[pos] = grid->get(i,j,k);
+
+      num_Frames++;
+      return true;
+    }
+
+  if(gridType == GRID_3D_TWOSTEP){
+      TwoStepMatrix3D* grid = gridsHolder->getTwoStepMatrix3DByName(gridName);
+
+      if(grid->xSize() != x_Size){
+          std::cout<<"X-dimensions of FrameData object \""<<_name<<"\" and grid object \""<<gridName<<"\" do not match.\n";
+          doSizesMatch = false;
+        }
+
+      if(grid->ySize() != y_Size){
+          std::cout<<"Y-dimensions of FrameData object \""<<_name<<"\" and grid object \""<<gridName<<"\" do not match.\n";
+          doSizesMatch = false;
+        }
+
+      if(grid->zSize() != z_Size){
+          std::cout<<"Z-dimensions of FrameData object \""<<_name<<"\" and grid object \""<<gridName<<"\" do not match.\n";
+          doSizesMatch = false;
+        }
+
+      if(!doSizesMatch)
+        return false;
+
+      data.resize(data.size() + x_Size*y_Size*z_Size);
+
+      size_t pos = atFrame * x_Size * y_Size * z_Size;
+
+      for(size_t i=0;i<x_Size;i++)
+        for(size_t j=0;j<y_Size;j++)
+          for(size_t k=0;k<z_Size;k++,pos++)
+
+            data[pos] = grid->getOld(i,j,k);
+
+      num_Frames++;
+
+      return true;
+    }
+
+  std::cout<<"Grid \""<<gridName<<"\" is neither of type Matrix3D nor TwoStepMatrix3D.\n";
+  return false;
+}
+
+OpenGLWindow::FrameData::FrameData(size_t xSize, size_t ySize, size_t zSize){
+
+  x_Size = xSize;
+  y_Size = ySize;
+  z_Size = zSize;
+  num_Frames = 0;
 }

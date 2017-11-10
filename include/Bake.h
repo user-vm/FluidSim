@@ -13,8 +13,18 @@
 
 #define TAU_TUNING_CONSTANT 0.97
 
-enum GridType {GRID_3D = 1, GRID_3D_TWOSTEP = 2, GRID_3D_7PL = 3};
+enum GridType {GRID_3D = 1, GRID_3D_TWOSTEP = 2, GRID_3D_7PL = 3, GRID_INVALID = 0};
+/*
+class DisplayableMatrix{
 
+public:
+  size_t xSize() = 0;
+  size_t ySize() = 0;
+  size_t zSize() = 0;
+
+  float get(size_t x, size_t y, size_t z);
+};
+*/
 // a representation of a 6D seven point Lagrangian matrix, containing only four values due to symmetry
 class SevenPointLagrangianMatrix{
 public:
@@ -117,6 +127,10 @@ public:
   float getNew(size_t x, size_t y, size_t z);
   float getOld(size_t x, size_t y, size_t z);
 
+  // default get, so the interface can be used with this class
+  // gets from old
+  float get(size_t x, size_t y, size_t z);
+
   size_t xSize();
 
   size_t ySize();
@@ -146,7 +160,7 @@ public:
   //GridTuple()
   GridTuple(std::string gridName, GridType gridType, size_t x, size_t y, size_t z);
   GridTuple(std::string gridName, GridType gridType, size_t x, size_t y, size_t z, float outsideValue);
-  ~GridTuple();
+  //~GridTuple();
 
   friend class GridsHolder;
 
@@ -160,7 +174,7 @@ private:
 class GridsHolder{
 
 public:
-  GridsHolder(std::vector<GridTuple> listOfGrids, float gridCellSize, float timeStep,
+  GridsHolder(std::vector<GridTuple*> listOfGrids, float gridCellSize, float timeStep,
               float projectionTolerance, size_t maxIterations,
               float density, ngl::Vec3 g);
   ~GridsHolder();
@@ -215,6 +229,22 @@ public:
   bool body();
   bool body(float dt);
 
+  // this might not be good
+  // template<class T>
+  // T* getAnyByName(std::string name);
+
+  GridType getTypeByName(std::string name);
+
+  // placeholder functions for testing FrameData and displaying the frames
+  bool advectDummy(std::vector<std::string> gridsToAdvectNames);
+  bool advectDummy(std::vector<std::string> gridsToAdvectNames, float dt);
+
+  bool bodyDummy();
+  bool bodyDummy(float dt);
+
+  bool projectDummy();
+  bool projectDummy(float dt);
+
 private:
   // union doesn't work for these classes, at least not like this
   /*
@@ -224,12 +254,6 @@ private:
     SevenPointLagrangianMatrix _sevenPointLagrangian;
   };*/
   //typedef std::array<std::unique_ptr<Matrix3D>,2> TwoStepMatrix3D;
-
-  // this is probably stupid, so it'll be private
-  template<class T>
-  T* getAnyByName(std::string name);
-
-  GridType getTypeByName(std::string name);
 
   std::vector<std::string> _gridNames;
   std::vector<GridElement> _grids;
