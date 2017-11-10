@@ -47,9 +47,9 @@ void  OpenGLWindow::makeCubes( GLfloat _size)
   // as we are doing lines it will be 2 verts per line
   // and we need to add 1 to each of them for the <= loop
   // and finally muliply by 12 as we have 12 values per line pair
-  qint64 k=-1;
+  qint64 kVertex=-1, kNormal=-1, kColor = -1;
   m_cubeSubVBOSize=3*3*2*6*3;//3 coordinates per vertex, 3 vertices per tri, 2 tris per quad, 6 quads per cube, 3 data types (vertex, normal, colour)
-  m_vboSize= m_cubeSubVBOSize*xSimSize*ySimSize*zSimSize*3;
+  m_vboSize= (m_cubeSubVBOSize*xSimSize*ySimSize*zSimSize*10)/3;
 
   std::unique_ptr<GLfloat []>vertexData( new GLfloat[m_vboSize]);
 
@@ -126,19 +126,20 @@ void  OpenGLWindow::makeCubes( GLfloat _size)
 
             for(int t=0;t<3;t++){
                 //vertex position
-                vertexData[++k]=(verts[i+t].m_x+d1*1 - xSimSize/2.0)*_size;
-                vertexData[++k]=(verts[i+t].m_y+d2*1 - ySimSize/2.0)*_size;
-                vertexData[++k]=(verts[i+t].m_z+d3*1 - zSimSize/2.0)*_size;
+                vertexData[++kVertex]=(verts[i+t].m_x+d1*1 - xSimSize/2.0)*_size;
+                vertexData[++kVertex]=(verts[i+t].m_y+d2*1 - ySimSize/2.0)*_size;
+                vertexData[++kVertex]=(verts[i+t].m_z+d3*1 - zSimSize/2.0)*_size;
 
                 //vertex normal; factor of two because each quad center is 0.5 away from cube origin
-                vertexData[++k]=verts[i+t].m_x * 2 * xCoeff;
-                vertexData[++k]=verts[i+t].m_y * 2 * yCoeff;
-                vertexData[++k]=verts[i+t].m_z * 2 * zCoeff;
+                vertexData[++kNormal]=verts[i+t].m_x * 2 * xCoeff;
+                vertexData[++kNormal]=verts[i+t].m_y * 2 * yCoeff;
+                vertexData[++kNormal]=verts[i+t].m_z * 2 * zCoeff;
 
                 //vertex color
-                vertexData[++k]=0.5 + d1*0.5/xSimSize;// + verts[i+t].m_x;
-                vertexData[++k]=0.5 + d2*0.5/ySimSize;// + verts[i+t].m_y;
-                vertexData[++k]=0.5 + d3*0.5/zSimSize;// + verts[i+t].m_z;
+                vertexData[++kColor]=0.5 + d1*0.5/xSimSize;// + verts[i+t].m_x;
+                vertexData[++kColor]=0.5 + d2*0.5/ySimSize;// + verts[i+t].m_y;
+                vertexData[++kColor]=0.5 + d3*0.5/zSimSize;// + verts[i+t].m_z;
+                vertexData[++kColor]=0.5;
 
                 std::cout<<vertexData[k]<<"\n";
 
@@ -161,6 +162,7 @@ void  OpenGLWindow::makeCubes( GLfloat _size)
   // then the pointer to the actual data
   // Then how we are going to draw it (in this case Statically as the data will not change)
   glBufferData(GL_ARRAY_BUFFER, m_vboSize*sizeof(GL_FLOAT) , vertexData.get(), GL_DYNAMIC_DRAW);
+  glBufferSubData();
 
   startTimer(100);
   timer.start();
@@ -178,13 +180,18 @@ void OpenGLWindow::paintGL()
   glEnableClientState(GL_VERTEX_ARRAY);
   glEnableClientState(GL_COLOR_ARRAY);
   glEnableClientState(GL_NORMAL_ARRAY);
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  //glEnableClientState(GL_POLYGON_STIPPLE); //<- consider using if glBlend doesn't work right
   // bind our VBO data to be the currently active one
 
   //glUseProgram(shaderProgramID);
 
-  glVertexPointer(3,GL_FLOAT,9*sizeof(GL_FLOAT),(void*)0); //SET THE STRIDE
-  glNormalPointer(GL_FLOAT,9*sizeof(GL_FLOAT),(void*)(3*sizeof(GL_FLOAT)));
-  glColorPointer(3,GL_FLOAT,9*sizeof(GL_FLOAT),(void*)(6*sizeof(GL_FLOAT)));
+  glVertexPointer(3,GL_FLOAT,10*sizeof(GL_FLOAT),(void*)0); //SET THE STRIDE
+  glNormalPointer(GL_FLOAT,10*sizeof(GL_FLOAT),(void*)(3*sizeof(GL_FLOAT)));
+  glColorPointer(4,GL_FLOAT,10*sizeof(GL_FLOAT),(void*)(6*sizeof(GL_FLOAT)));
+
+  //glPolygonStipple();
 
   glPushMatrix();
   glRotatef(360.0* (m_spin?(timer.elapsed()/5000.0):1),0.0,1.0,0.0);  //* timer.elapsed()/5000
