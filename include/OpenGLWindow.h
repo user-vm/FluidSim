@@ -177,6 +177,8 @@ class OpenGLWindow : public QOpenGLWindow
     class FrameData{
 
     public:
+      enum GLfloatTransformationMethod {WHOLE_CUBE = 0, CUBE_WALL_X = 1, CUBE_WALL_Y = 2, CUBE_WALL_Z = 3};
+
       FrameData(size_t xSize, size_t ySize, size_t zSize);
       //~FrameData();
 
@@ -197,7 +199,7 @@ class OpenGLWindow : public QOpenGLWindow
       bool addFrame(GridsHolder* gridsHolder, std::string gridName);
       bool addFrame(GridsHolder* gridsHolder, std::string gridName, size_t index);
 
-      std::unique_ptr<GLfloat[]> dataToGLfloat();
+      std::unique_ptr<GLfloat[]> dataToGLfloat(GLfloatTransformationMethod method);
 
     private:
       std::vector<float> data;
@@ -220,6 +222,12 @@ class OpenGLWindow : public QOpenGLWindow
     std::unique_ptr<FrameData> uFrameData;
     std::unique_ptr<FrameData> vFrameData;
     std::unique_ptr<FrameData> wFrameData;
+
+    //test iterator, remove later
+    size_t iter=0;
+
+    //total number of frames, calculate later
+    size_t totalFrames = 0;
 };
 
 #endif

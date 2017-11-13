@@ -47,14 +47,14 @@ void  OpenGLWindow::makeCubes( GLfloat _size)
   // as we are doing lines it will be 2 verts per line
   // and we need to add 1 to each of them for the <= loop
   // and finally muliply by 12 as we have 12 values per line pair
-  m_cubeSubVBOSize=3*3*2*6*3;//3 coordinates per vertex, 3 vertices per tri, 2 tris per quad, 6 quads per cube, 3 data types (vertex, normal, colour)
-  m_vboSize= (m_cubeSubVBOSize*xSimSize*ySimSize*zSimSize*10)/3;
+  m_cubeSubVBOSize=3*2*6*(6+totalFrames*4);// 6 + totalFrames coordinates per vertex for now, 3 vertices/tri, 2 tris/quad, 6 quads/cube //3 coordinates per vertex, 3 vertices per tri, 2 tris per quad, 6 quads per cube, 3 data types (vertex, normal, colour)
+  m_vboSize= m_cubeSubVBOSize*xSimSize*ySimSize*zSimSize;
 
   // all vertex position data, all normal data, all color data
-  m_normalOffset = (3*2*6*3)*3*xSimSize*ySimSize*zSimSize;
-  m_colorOffset = (3*2*6*3)*6*xSimSize*ySimSize*zSimSize;
+  m_normalOffset = (3*2*6)*3*xSimSize*ySimSize*zSimSize;
+  m_colorOffset = (3*2*6)*6*xSimSize*ySimSize*zSimSize;
 
-  qint64 kVertex=-1, kNormal=m_normalOffset-1, kColor = m_colorOffset-1;
+  qint64 kVertex=-1, kNormal=m_normalOffset-1, kColor = m_colorOffset-1, kPres = -1;
 
   std::unique_ptr<GLfloat []>vertexData( new GLfloat[m_vboSize]);
 
@@ -141,10 +141,11 @@ void  OpenGLWindow::makeCubes( GLfloat _size)
                 vertexData[++kNormal]=verts[i+t].m_z * 2 * zCoeff;
 
                 //vertex color
-                vertexData[++kColor]=0.5 + d1*0.5/xSimSize;// + verts[i+t].m_x;
-                vertexData[++kColor]=0.5 + d2*0.5/ySimSize;// + verts[i+t].m_y;
-                vertexData[++kColor]=0.5 + d3*0.5/zSimSize;// + verts[i+t].m_z;
-                vertexData[++kColor]=0.5;
+                for(int gc=0;gc<totalFrames;gc++){
+                vertexData[++kColor]=pressureColorData[++kPres];//0.5 + d1*0.5/xSimSize;// + verts[i+t].m_x;
+                vertexData[++kColor]=pressureColorData[++kPres];//0.5 + d2*0.5/ySimSize;// + verts[i+t].m_y;
+                vertexData[++kColor]=pressureColorData[++kPres];//0.5 + d3*0.5/zSimSize;// + verts[i+t].m_z;
+                vertexData[++kColor]=pressureColorData[++kPres];}//0.5;}
 
                 //std::cout<<vertexData[k]<<"\n";
 
@@ -166,7 +167,10 @@ void  OpenGLWindow::makeCubes( GLfloat _size)
   // then the number of bytes we are storing (need to tell it's a sizeof(FLOAT)
   // then the pointer to the actual data
   // Then how we are going to draw it (in this case Statically as the data will not change)
+  //glBufferData(GL_ARRAY_BUFFER, kColor*sizeof(GL_FLOAT) , vertexData.get(), GL_DYNAMIC_DRAW);
   glBufferData(GL_ARRAY_BUFFER, m_vboSize*sizeof(GL_FLOAT) , vertexData.get(), GL_DYNAMIC_DRAW);
+
+  //m_vboSize = kColor;
 
 }
 
@@ -183,21 +187,25 @@ void OpenGLWindow::paintGL()
   glEnableClientState(GL_NORMAL_ARRAY);
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-  glEnableClientState(GL_POLYGON_STIPPLE); //<- consider using if glBlend doesn't work right
+  //glEnableClientState(GL_POLYGON_STIPPLE); //<- consider using if glBlend doesn't work right
   // bind our VBO data to be the currently active one
 
   //glUseProgram(shaderProgramID);
 
   glVertexPointer(3,GL_FLOAT,0,(void*)0);
-  glNormalPointer(GL_FLOAT,0,(void*)(m_normalOffset*sizeof(GL_FLOAT)));
-  glColorPointer(4,GL_FLOAT,0,(void*)(m_colorOffset*sizeof(GL_FLOAT)));
+  glNormalPointer(GL_FLOAT,0,(void*)(m_normalOffset*sizeof(GLfloat)));
+  glColorPointer(4,GL_FLOAT,0,(void*)((m_colorOffset+(m_vboSize-m_colorOffset)/totalFrames*(int(timer.elapsed()/1000.0/frameDuration)%totalFrames))*sizeof(GLfloat)));
+  //iter++;
+
+  int xd = int(timer.elapsed()/1000.0/frameDuration)%totalFrames;
+  std::cout<<xd<<"\n";
 
   //glPolygonStipple();
 
   glPushMatrix();
-  glRotatef(360.0* (m_spin?(timer.elapsed()/5000.0):1),0.0,1.0,0.0);  //* timer.elapsed()/5000
+  //glRotatef(360.0* (m_spin?(timer.elapsed()/5000.0):1),0.0,1.0,0.0);  //* timer.elapsed()/5000
   glRotatef(45.0,-0.4,1.0,0.0);
-  glDrawArrays(GL_TRIANGLES, 0, m_vboSize/3);
+  glDrawArrays(GL_TRIANGLES, 0, m_normalOffset/3);
   glPopMatrix();
   // now turn off the VBO client state as we have finished with it
   glDisableClientState(GL_NORMAL_ARRAY);
@@ -207,12 +215,14 @@ void OpenGLWindow::paintGL()
 
 void OpenGLWindow::timerEvent(QTimerEvent *)
 {
+  //std::cout<<timer.elapsed()<<"\n";
   update();
-  return;
-  int frameOffset = int(timer.elapsed()/frameDuration) % pressureFrameData->numFrames();
-  glBufferSubData(GL_ARRAY_BUFFER,(GLintptr)(pressureFrameData->frameSize()*frameOffset*sizeof(float)),
-                  pressureFrameData->frameSize(),pressureColorData.get());
-  update();
+  //return;
+  /*
+  int frameOffset = 0;//int(timer.elapsed()/(frameDuration*1000)) % pressureFrameData->numFrames();
+  glBufferSubData(GL_ARRAY_BUFFER,(GLintptr)(m_colorOffset*sizeof(GLfloat)), //+pressureFrameData->frameSize()*frameOffset*sizeof(float)),
+                  pressureFrameData->frameSize()*4*3*2*6*sizeof(GLfloat)*10,&((pressureColorData.get())[frameOffset*4*3*2*6]));
+  update();*/
 }
 
 void OpenGLWindow::keyPressEvent(QKeyEvent *_event)
@@ -386,14 +396,18 @@ void OpenGLWindow::bake(){
       tempDt = dt;
     }
 
-  pressureColorData = pressureFrameData->dataToGLfloat();
-  uColorData = uFrameData->dataToGLfloat();
-  vColorData = vFrameData->dataToGLfloat();
-  wColorData = wFrameData->dataToGLfloat();
+  grids.reset();
+
+  pressureColorData = pressureFrameData->dataToGLfloat(FrameData::WHOLE_CUBE);
+  //uColorData = uFrameData->dataToGLfloat(FrameData::CUBE_WALL_X);
+  //vColorData = vFrameData->dataToGLfloat(FrameData::CUBE_WALL_Y);
+  //wColorData = wFrameData->dataToGLfloat(FrameData::CUBE_WALL_Z);
+
+  totalFrames = currentFrame+1;
 
   std::cout<<"Finished bake.\n";
 
-  startTimer(frameDuration);
+  startTimer(frameDuration*1000);
   timer.start();
 }
 
@@ -520,9 +534,35 @@ size_t OpenGLWindow::FrameData::frameSize(){
   return x_Size * y_Size * z_Size;
 }
 
-std::unique_ptr<GLfloat[]> OpenGLWindow::FrameData::dataToGLfloat(){
+std::unique_ptr<GLfloat[]> OpenGLWindow::FrameData::dataToGLfloat(GLfloatTransformationMethod method){
 
-  return std::unique_ptr<GLfloat[]>(data.data());
+  //return std::unique_ptr<GLfloat[]>(data.data());
+  const int numCubeVars = 4 * 3 * 2 * 6; //4 color values/tri * 3 vertices/tri * 2 tris/quad * 6 quads/cube
+
+  std::unique_ptr<GLfloat[]> floatData(new GLfloat[frameSize()*numFrames()*numCubeVars]);
+
+  float maxVal = (*(std::max_element(data.begin(),data.end())));
+
+  std::cout<<"MAX="<<maxVal<<"\n";
+
+  size_t k = 0, k2 = 0;
+
+  std::cout<<"METHOD="<<method<<"\n";
+
+  if(method == WHOLE_CUBE) //this is the easiest to implement, start with this
+    for(size_t i_fr = 0;i_fr<num_Frames;i_fr++)
+      for(size_t i_x=0;i_x<x_Size;i_x++)
+        for(size_t i_y=0;i_y<y_Size;i_y++)
+          for(size_t i_z=0;i_z<z_Size;i_z++,k2++)
+            for(size_t i_c=0;i_c<numCubeVars/4;i_c++){
+
+              floatData[k++] = 1;
+              floatData[k++] = 1;
+              floatData[k++] = 0;
+              floatData[k++] = data[k2]/maxVal;}
+
+  return floatData;
+
 }
 
 size_t OpenGLWindow::FrameData::numFrames(){
