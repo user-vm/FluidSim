@@ -1,0 +1,18 @@
+\documentclass{article}
+\begin{document}
+The project involves fluid simulation, initially based on the methods outlined in Robert Bridson and Matthias Muller-Fischer's 2007 Siggraph course.
+Liquid fluids, and to a lesser extend gases, can be considered incompressible in most simulations. The behaviour of incompressible fluids is given by the Navier-Stokes equation:
+
+[Navier-Stokes equation]
+
+This is simplified by breaking the equation down into three parts: the advection, body, and projection equations, and applying their respective processes advect, body and project in sequence for each time step
+
+
+When applied to the entire fluid, the advection equation enforces the conservation of energy (the fuild mass undergoes no net acceleration without the application of a net force). The advect( process applies the velocity field to the quantity q for a time dt. This quantity may be velocity itself, pressure, or another quantity relevant to the particular fluid (such as temperature for smoke simulation).
+Since in truth the fluid is acted on by the net force of gravity, the body process simply adds gdt to the velocity field (all the members of the grid).
+The incompressibility of the fluid is enforced by the 
+
+Seven Point Lagrangian Matrix
+MIC(0) preconditioner
+\end{document}
+
