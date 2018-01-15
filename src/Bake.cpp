@@ -289,9 +289,9 @@ GridsHolder::GridsHolder(std::vector<std::unique_ptr<GridTuple> > listOfGrids, f
 
       switch(listOfGrids[i]->_gridType){
 
-        case GRID_3D:         {_grids.push_back(GridElement(new Matrix3D(listOfGrids[i]->_x,listOfGrids[i]->_y,listOfGrids[i]->_z))); break;}
-        case GRID_3D_7PL:     {_grids.push_back(GridElement(new SevenPointLagrangianMatrix(listOfGrids[i]->_x,listOfGrids[i]->_y,listOfGrids[i]->_z, true))); break;}
-        case GRID_3D_TWOSTEP: {_grids.push_back(GridElement(new TwoStepMatrix3D(listOfGrids[i]->_x,listOfGrids[i]->_y,listOfGrids[i]->_z))); break;}
+        case GRID_3D:         {_grids_M3D.push_back(new Matrix3D(listOfGrids[i]->_x,listOfGrids[i]->_y,listOfGrids[i]->_z)); break;}
+        case GRID_3D_7PL:     {_grids_7PL.push_back(new SevenPointLagrangianMatrix(listOfGrids[i]->_x,listOfGrids[i]->_y,listOfGrids[i]->_z, true)); break;}
+        case GRID_3D_TWOSTEP: {_grids_2SM3D.push_back(new TwoStepMatrix3D(listOfGrids[i]->_x,listOfGrids[i]->_y,listOfGrids[i]->_z)); break;}
         default:              continue;
         }
 
@@ -316,6 +316,8 @@ size_t GridsHolder::size(){
   return _gridNames.size();
 }
 
+//QtCreator is too shit to debug boost variants even with helpers
+/*
 Matrix3D* GridsHolder::getMatrix3DByName(std::string name){
   for(size_t i=0;i<_gridTypes.size();i++)
     if(_gridTypes[i] == GRID_3D && _gridNames[i]==name)
@@ -339,6 +341,7 @@ TwoStepMatrix3D* GridsHolder::getTwoStepMatrix3DByName(std::string name){
 
   return NULL;
 }
+*/
 /*
 template<typename T>
 T* GridsHolder::getAnyByName(std::string name){
@@ -349,6 +352,43 @@ T* GridsHolder::getAnyByName(std::string name){
   return NULL;
 }
 */
+
+Matrix3D* GridsHolder::getMatrix3DByName(std::string name){
+
+  int j=0;
+  for(size_t i=0;i<_gridTypes.size();i++)
+    if(_gridTypes[i] == GRID_3D){
+      if(_gridNames[i]==name)
+        return _grids_M3D[j];
+      j++;}
+
+  return NULL;
+}
+
+SevenPointLagrangianMatrix* GridsHolder::getSevenPointLagrangianMatrixByName(std::string name){
+
+  int j=0;
+  for(size_t i=0;i<_gridTypes.size();i++)
+    if(_gridTypes[i] == GRID_3D_7PL){
+      if(_gridNames[i]==name)
+        return _grids_7PL[j];
+      j++;}
+
+  return NULL;
+}
+
+TwoStepMatrix3D* GridsHolder::getTwoStepMatrix3DByName(std::string name){
+
+  int j=0;
+  for(size_t i=0;i<_gridTypes.size();i++)
+    if(_gridTypes[i] == GRID_3D_TWOSTEP){
+      if(_gridNames[i]==name)
+        return _grids_2SM3D[j];
+      j++;}
+
+  return NULL;
+}
+
 bool GridsHolder::advect(std::vector<std::string> gridsToAdvectNames){
 
   return advect(gridsToAdvectNames, default_dt);
@@ -386,7 +426,7 @@ bool GridsHolder::advect(std::vector<std::string> gridsToAdvectNames, float dt)
       if(!c->isCentered()){
 
           ngl::Vec3 velocity;
-          float xn, xp, yn, yp, zn, zp, ax, ay, az;
+          float xn, xp, yn, yp, zn, zp, ax, ay, az, newC;
           int ixp, iyp, izp;
 
           x_Size = c->xSize();
@@ -409,31 +449,40 @@ bool GridsHolder::advect(std::vector<std::string> gridsToAdvectNames, float dt)
                   xn = dx * (ix + 0.5);
                   xp = xn - dt * velocity.m_x;
                   ixp = floor(xp/dx - 0.5);
-                  ax = dx * (ixp + 0.5);
+                  ax = xp/dx - (ixp + 0.5);
 
                   yn = dx * (iy + 0.5);
                   yp = yn - dt * velocity.m_y;
                   iyp = floor(yp/dx - 0.5);
-                  ay = dx * (iyp + 0.5);
+                  ay = yp/dx - (iyp + 0.5);
 
                   zn = dx * (iz + 0.5);
                   zp = zn - dt * velocity.m_z;
                   izp = floor(zp/dx - 0.5);
-                  az = dx * (izp + 0.5);
+                  az = zp/dx - (izp + 0.5);
+
+                  if((ix*y_Size+iy)*z_Size+iz==555 && cName=="p")
+                    std::cout<<"nacho ";
+
+                  newC = 0;
 
                   for(size_t i=0;i<2;i++)
                     for(size_t j=0;j<2;j++)
-                      for(size_t k=0;k<2;k++){
-                          if(ixp+i>=x_Size || iyp+j>=y_Size || izp+k>=z_Size){ // outside the simulation volume, there is a constant value for the quantity
-                            c->setNew(ix,iy,iz,c->getOutsideValue());
-                            continue;}
-                          c->setNew(ix,iy,iz,(i?ax:(1-ax))*(j?ay:(1-ay))*(k?(1-az):az) * c->getNew(ixp+i,iyp+j,izp+k));
-                        }
+                      for(size_t k=0;k<2;k++)
+                          if(ixp+i>=x_Size || iyp+j>=y_Size || izp+k>=z_Size) // outside the simulation volume, there is a constant value for the quantity
+                            newC += c->getOutsideValue();
+                          else
+                            newC += (i?ax:(1-ax))*(j?ay:(1-ay))*(k?az:(1-az)) * c->getOld(ixp+i,iyp+j,izp+k);
+
+                  c->setNew(ix,iy,iz,newC);
+
+                  if((ix*y_Size+iy)*z_Size+iz==555 && cName=="p")
+                    std::cout<<"cheese\n";
                 }
         }
       else{
 
-          float xn, xp, yn, yp, zn, zp, ax, ay, az;
+          float xn, xp, yn, yp, zn, zp, ax, ay, az, newC;
           int ixp, iyp, izp;
 
           for(size_t ix=0;ix<x_Size;ix++)
@@ -449,26 +498,29 @@ bool GridsHolder::advect(std::vector<std::string> gridsToAdvectNames, float dt)
                   xn = dx * ix;
                   xp = xn - dt * u->getOld(ix,iy,iz);
                   ixp = floor(xp/dx);
-                  ax = dx * ixp;
+                  ax = xp/dx - ixp;
 
                   yn = dx * iy;
                   yp = yn - dt * v->getOld(ix,iy,iz);
                   iyp = floor(yp/dx);
-                  ay = dx * iyp;
+                  ay = yp/dx - iyp;
 
                   zn = dx * iz;
                   zp = zn - dt * w->getOld(ix,iy,iz);
                   izp = floor(zp/dx);
-                  az = dx * izp;
+                  az = zp/dx - izp;
+
+                  newC = 0;
 
                   for(size_t i=0;i<2;i++)
                     for(size_t j=0;j<2;j++)
-                      for(size_t k=0;k<2;k++){
-                          if(ixp+i>=x_Size || iyp+j>=y_Size || izp+k>=z_Size){ // outside the simulation volume, there is a constant value for the quantity
-                            c->setNew(ix,iy,iz,c->getOutsideValue());
-                            continue;}
-                          c->setNew(ix,iy,iz,(i?ax:(1-ax))*(j?ay:(1-ay))*(k?(1-az):az)*c->getNew(ixp+i,iyp+j,izp+k));
-                        }
+                      for(size_t k=0;k<2;k++)
+                          if(ixp+i>=x_Size || iyp+j>=y_Size || izp+k>=z_Size) // outside the simulation volume, there is a constant value for the quantity
+                            newC += c->getOutsideValue();
+                          else
+                            newC += (i?ax:(1-ax))*(j?ay:(1-ay))*(k?az:(1-az))*c->getOld(ixp+i,iyp+j,izp+k);
+
+                  c->setNew(ix,iy,iz,newC);
 
                 }
 
@@ -545,8 +597,8 @@ bool GridsHolder::project(float dt, float tol, size_t maxIterations)
 
   SevenPointLagrangianMatrix* A = getSevenPointLagrangianMatrixByName("A");
 
-  std::vector<std::pair<Matrix3D*,std::string>> utilityMatrixList = {std::make_pair(z,"z"),
-                                                                     std::make_pair(d,"d"),
+  std::vector<std::pair<Matrix3D*,std::string>> utilityMatrixList = {std::make_pair(d,"d"),
+                                                                     std::make_pair(z,"z"),
                                                                      std::make_pair(s,"s"),
                                                                      std::make_pair(r,"r"),
                                                                      std::make_pair(precon,"precon"),
@@ -596,6 +648,8 @@ bool GridsHolder::project(float dt, float tol, size_t maxIterations)
 
   if(breakIteration)
     it = maxIterations + 2; // give it a value that will skip the loop, but also lets us know that maxIterations was not truly exceeded
+  else
+    it = 0;
 
   //first we apply the preconditioner
   applyPreconditioner("r",sigma);
@@ -604,7 +658,7 @@ bool GridsHolder::project(float dt, float tol, size_t maxIterations)
 
   float maxAbsR, a, b;
 
-  for(it=0;it<maxIterations;it++){
+  for(;it<maxIterations;it++){
 
       maxAbsR = 0;
 
@@ -615,7 +669,7 @@ bool GridsHolder::project(float dt, float tol, size_t maxIterations)
         for(size_t j=0;j<ySize;j++)
           for(size_t k=0;k<zSize;k++){
 
-              p->setNew(i,j,k, p->getNew(i,j,k) + a * s->get(i,j,k));
+              p->setNew(i,j,k, p->getOld(i,j,k) + a * s->get(i,j,k));
               r->set(i,j,k,r->get(i,j,k) - a * z->get(i,j,k));
 
               if(abs(r->get(i,j,k)) > maxAbsR)
@@ -769,17 +823,20 @@ bool GridsHolder::applyPreconditioner(std::string targetName, float& sigma, std:
 
   sigma = 0;
 
-  for(size_t i=xSize;i>0;--i)
-    for(size_t j=ySize;j>0;--j)
-      for(size_t k=zSize;k>0;--k){
+  for(int i=xSize-1;i>=0;i--)
+    for(int j=ySize-1;j>=0;j--)
+      for(int k=zSize-1;k>=0;k--){
 
           t = q->get(i,j,k);
-          if(i<xSize)
+          if(i<xSize-1)
             t-= A->get(i,j,k).iUp * precon->get(i,j,k) * z->get(i+1,j,k);
-          if(j<ySize)
+          if(j<ySize-1)
             t-= A->get(i,j,k).jUp * precon->get(i,j,k) * z->get(i,j+1,k);
-          if(k<zSize)
+          if(k<zSize-1)
             t-= A->get(i,j,k).kUp * precon->get(i,j,k) * z->get(i,j,k+1);
+
+          if(t== NAN)
+            std::cout<<"NAN";
 
           z->set(i,j,k, t * precon->get(i,j,k));
 
@@ -945,9 +1002,9 @@ bool GridsHolder::append(std::vector<GridTuple> listOfGrids){
 
       switch(i._gridType){
 
-        case GRID_3D:         {_grids.push_back(GridElement(new Matrix3D(i._x,i._y,i._z))); break;}
-        case GRID_3D_7PL:     {_grids.push_back(GridElement(new SevenPointLagrangianMatrix(i._x,i._y,i._z, true))); break;}
-        case GRID_3D_TWOSTEP: {_grids.push_back(GridElement(new TwoStepMatrix3D(i._x,i._y,i._z))); break;}
+        case GRID_3D:         {_grids_M3D.push_back(new Matrix3D(i._x,i._y,i._z)); break;}
+        case GRID_3D_7PL:     {_grids_7PL.push_back(new SevenPointLagrangianMatrix(i._x,i._y,i._z, true)); break;}
+        case GRID_3D_TWOSTEP: {_grids_2SM3D.push_back(new TwoStepMatrix3D(i._x,i._y,i._z)); break;}
         default:              continue;
         }
 
@@ -969,9 +1026,9 @@ bool GridsHolder::append(GridTuple gridTuple){
 
   switch(gridTuple._gridType){
 
-    case GRID_3D:         {_grids.push_back(GridElement(new Matrix3D(gridTuple._x,gridTuple._y,gridTuple._z))); break;}
-    case GRID_3D_7PL:     {_grids.push_back(GridElement(new SevenPointLagrangianMatrix(gridTuple._x,gridTuple._y,gridTuple._z, true))); break;}
-    case GRID_3D_TWOSTEP: {_grids.push_back(GridElement(new TwoStepMatrix3D(gridTuple._x,gridTuple._y,gridTuple._z))); break;}
+    case GRID_3D:         {_grids_M3D.push_back(new Matrix3D(gridTuple._x,gridTuple._y,gridTuple._z)); break;}
+    case GRID_3D_7PL:     {_grids_7PL.push_back(new SevenPointLagrangianMatrix(gridTuple._x,gridTuple._y,gridTuple._z, true)); break;}
+    case GRID_3D_TWOSTEP: {_grids_2SM3D.push_back(new TwoStepMatrix3D(gridTuple._x,gridTuple._y,gridTuple._z)); break;}
     default:              return false;
     }
 
@@ -1000,9 +1057,9 @@ bool GridsHolder::append(std::vector<std::unique_ptr<GridTuple>> listOfGrids){
 
       switch(listOfGrids[i].get()->_gridType){
 
-        case GRID_3D:         {_grids.push_back(GridElement(new Matrix3D(listOfGrids[i].get()->_x,listOfGrids[i].get()->_y,listOfGrids[i].get()->_z))); break;}
-        case GRID_3D_7PL:     {_grids.push_back(GridElement(new SevenPointLagrangianMatrix(listOfGrids[i].get()->_x,listOfGrids[i].get()->_y,listOfGrids[i].get()->_z, true))); break;}
-        case GRID_3D_TWOSTEP: {_grids.push_back(GridElement(new TwoStepMatrix3D(listOfGrids[i].get()->_x,listOfGrids[i].get()->_y,listOfGrids[i].get()->_z))); break;}
+        case GRID_3D:         {_grids_M3D.push_back(new Matrix3D(listOfGrids[i].get()->_x,listOfGrids[i].get()->_y,listOfGrids[i].get()->_z)); break;}
+        case GRID_3D_7PL:     {_grids_7PL.push_back(new SevenPointLagrangianMatrix(listOfGrids[i].get()->_x,listOfGrids[i].get()->_y,listOfGrids[i].get()->_z, true)); break;}
+        case GRID_3D_TWOSTEP: {_grids_2SM3D.push_back(new TwoStepMatrix3D(listOfGrids[i].get()->_x,listOfGrids[i].get()->_y,listOfGrids[i].get()->_z)); break;}
         default:              continue;
         }
 
@@ -1024,9 +1081,9 @@ bool GridsHolder::append(std::unique_ptr<GridTuple> gridTuple){
 
   switch(gridTuple.get()->_gridType){
 
-    case GRID_3D:         {_grids.push_back(GridElement(new Matrix3D(gridTuple.get()->_x,gridTuple.get()->_y,gridTuple.get()->_z))); break;}
-    case GRID_3D_7PL:     {_grids.push_back(GridElement(new SevenPointLagrangianMatrix(gridTuple.get()->_x,gridTuple.get()->_y,gridTuple.get()->_z, true))); break;}
-    case GRID_3D_TWOSTEP: {_grids.push_back(GridElement(new TwoStepMatrix3D(gridTuple.get()->_x,gridTuple.get()->_y,gridTuple.get()->_z))); break;}
+    case GRID_3D:         {_grids_M3D.push_back(new Matrix3D(gridTuple.get()->_x,gridTuple.get()->_y,gridTuple.get()->_z)); break;}
+    case GRID_3D_7PL:     {_grids_7PL.push_back(new SevenPointLagrangianMatrix(gridTuple.get()->_x,gridTuple.get()->_y,gridTuple.get()->_z, true)); break;}
+    case GRID_3D_TWOSTEP: {_grids_2SM3D.push_back(new TwoStepMatrix3D(gridTuple.get()->_x,gridTuple.get()->_y,gridTuple.get()->_z)); break;}
     default:              return false;
     }
 

@@ -189,7 +189,7 @@ public:
 
   size_t size();
 
-  typedef boost::variant<Matrix3D*, SevenPointLagrangianMatrix*, TwoStepMatrix3D*> GridElement;
+  //typedef boost::variant<Matrix3D*, SevenPointLagrangianMatrix*, TwoStepMatrix3D*> GridElement;
 
   Matrix3D* getMatrix3DByName(std::string name);
 
@@ -256,7 +256,12 @@ private:
   //typedef std::array<std::unique_ptr<Matrix3D>,2> TwoStepMatrix3D;
 
   std::vector<std::string> _gridNames;
-  std::vector<GridElement> _grids;
+  //std::vector<GridElement> _grids;
+
+  std::vector<Matrix3D*> _grids_M3D;
+  std::vector<TwoStepMatrix3D*> _grids_2SM3D;
+  std::vector<SevenPointLagrangianMatrix*> _grids_7PL;
+
   std::vector<GridType> _gridTypes;
   std::vector<float> _outsideValues;
 

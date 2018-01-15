@@ -142,10 +142,10 @@ void  OpenGLWindow::makeCubes( GLfloat _size)
 
                 //vertex color
                 for(int gc=0;gc<totalFrames;gc++){
-                vertexData[++kColor]=pressureColorData[++kPres];//0.5 + d1*0.5/xSimSize;// + verts[i+t].m_x;
-                vertexData[++kColor]=pressureColorData[++kPres];//0.5 + d2*0.5/ySimSize;// + verts[i+t].m_y;
-                vertexData[++kColor]=pressureColorData[++kPres];//0.5 + d3*0.5/zSimSize;// + verts[i+t].m_z;
-                vertexData[++kColor]=pressureColorData[++kPres];}//0.5;}
+                    vertexData[++kColor]=pressureColorData[++kPres];//0.5 + d1*0.5/xSimSize;// + verts[i+t].m_x;
+                    vertexData[++kColor]=pressureColorData[++kPres];//0.5 + d2*0.5/ySimSize;// + verts[i+t].m_y;
+                    vertexData[++kColor]=pressureColorData[++kPres];//0.5 + d3*0.5/zSimSize;// + verts[i+t].m_z;
+                    vertexData[++kColor]=pressureColorData[++kPres];}//0.5;}
 
                 //std::cout<<vertexData[k]<<"\n";
 
@@ -262,15 +262,24 @@ void OpenGLWindow::initializePressure(GridsHolder *gridsHolder){
   size_t y_Size = p->ySize();
   size_t z_Size = p->zSize();
 
+  p->setOld(x_Size/2, y_Size/2 ,z_Size/2, 10.0);
+  p->setOld(x_Size/2+1, y_Size/2 ,z_Size/2, 10.0);
+  p->setOld(x_Size/2, y_Size/2+1 ,z_Size/2, 10.0);
+  p->setOld(x_Size/2, y_Size/2 ,z_Size/2+1, 10.0);
+
+  /*
   for(size_t i=0;i<x_Size;i++)
     for(size_t j=0;j<y_Size;j++)
       for(size_t k=0;k<z_Size;k++)
 
-        p->setOld(i,j,k,std::fabs(((x_Size*1.0)/2.0-i)/x_Size));
+        p->setOld(i,j,k,std::fabs(((x_Size*1.0)/2.0-i)/x_Size));*/
 }
 
 void OpenGLWindow::initializeVelocity(GridsHolder *gridsHolder){
 
+  //does nothing, all initial velocities will be zero
+
+  /*
   // here we will populate the velocity grids with their initial values
   TwoStepMatrix3D* u = gridsHolder->getTwoStepMatrix3DByName("u");
   TwoStepMatrix3D* v = gridsHolder->getTwoStepMatrix3DByName("v");
@@ -305,7 +314,7 @@ void OpenGLWindow::initializeVelocity(GridsHolder *gridsHolder){
       for(size_t k=0;k<z_Size;k++)
 
         w->setOld(i,j,k,std::fabs(((z_Size*1.0)/2.0-k)/z_Size));
-
+*/
 }
 
 void OpenGLWindow::bake(){
@@ -340,6 +349,7 @@ void OpenGLWindow::bake(){
   gridsToMake.push_back(std::unique_ptr<GridTuple>(new GridTuple("d",GRID_3D,xSimSize,ySimSize,zSimSize)));
   gridsToMake.push_back(std::unique_ptr<GridTuple>(new GridTuple("precon",GRID_3D,xSimSize,ySimSize,zSimSize)));
   gridsToMake.push_back(std::unique_ptr<GridTuple>(new GridTuple("q",GRID_3D,xSimSize,ySimSize,zSimSize)));
+  gridsToMake.push_back(std::unique_ptr<GridTuple>(new GridTuple("A",GRID_3D_7PL,xSimSize,ySimSize,zSimSize)));
 
   std::unique_ptr<GridsHolder> grids = std::unique_ptr<GridsHolder>(new GridsHolder(std::move(gridsToMake), dx, dt, tol, maxIterations, rho, g));
 
@@ -375,12 +385,12 @@ void OpenGLWindow::bake(){
 
       // only need information for two consectutive time steps
       // ADVECT RUNS WITH [0] AS OLD, BODY REWRITES [1], PROJECT RUNS WITH [1] AS OLD, REPEAT
-      grids.get()->advectDummy({"u","v","w","p"}, tempDt);
+      grids.get()->advect({"u","v","w","p"}, tempDt);
 
       // body function is just updating the velocities to account for gravity
-      grids.get()->bodyDummy(tempDt);
+      grids.get()->body(tempDt);
 
-      grids.get()->projectDummy(tempDt);
+      grids.get()->project(tempDt);
       simTime += tempDt;
 
       if(makeFrame){
