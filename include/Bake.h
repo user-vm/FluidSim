@@ -176,7 +176,7 @@ class GridsHolder{
 public:
   GridsHolder(std::vector<std::unique_ptr<GridTuple>> listOfGrids, float gridCellSize, float timeStep,
               float projectionTolerance, size_t maxIterations,
-              float density, ngl::Vec3 g);
+              float density, ngl::Vec3 g, float at, float bt);
   //~GridsHolder();
 
   bool append(std::vector<GridTuple> listOfGrids);
@@ -228,6 +228,9 @@ public:
 
   bool body();
   bool body(float dt);
+
+  bool bodyBouy();
+  bool bodyBouy(float dt);
 
   // this might not be good
   // template<class T>
@@ -282,6 +285,9 @@ private:
 
   // gravitational acceleration
   ngl::Vec3 _g;
+
+  //the coefficients of the buoyant force for smoke
+  float _at,_bt;
 };
 
 #endif

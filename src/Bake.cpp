@@ -273,7 +273,7 @@ GridTuple::GridTuple(std::string gridName, GridType gridType, size_t x, size_t y
 // GridsHolder functions
 
 GridsHolder::GridsHolder(std::vector<std::unique_ptr<GridTuple> > listOfGrids, float gridCellSize, float timeStep,
-                         float projectionTolerance, size_t maxIterations, float density, ngl::Vec3 g){
+                         float projectionTolerance, size_t maxIterations, float density, ngl::Vec3 g, float at, float bt){
 
   // custom lambda compare function; list gets sorted alphabetically
   std::sort(listOfGrids.begin(),listOfGrids.end(), [](const std::unique_ptr<GridTuple> &a, const std::unique_ptr<GridTuple> &b){
@@ -306,6 +306,8 @@ GridsHolder::GridsHolder(std::vector<std::unique_ptr<GridTuple> > listOfGrids, f
   _density = density;
   default_tol = projectionTolerance;
   _g = g;
+  _at = at;
+  _bt = bt;
   default_maxIterations = maxIterations;
 
 }
@@ -566,6 +568,7 @@ bool GridsHolder::project(float dt, float tol, size_t maxIterations)
   TwoStepMatrix3D* v = getTwoStepMatrix3DByName("v");
   TwoStepMatrix3D* w = getTwoStepMatrix3DByName("w");
   TwoStepMatrix3D* p = getTwoStepMatrix3DByName("p");
+  TwoStepMatrix3D* T = getTwoStepMatrix3DByName("T");
 
   bool objectMissing = false;
 
@@ -706,6 +709,7 @@ bool GridsHolder::project(float dt, float tol, size_t maxIterations)
   v->swap();
   w->swap();
   p->swap();
+  T->swap();
 
   if(it < maxIterations || it == maxIterations + 2)
     return true;
@@ -845,6 +849,48 @@ bool GridsHolder::applyPreconditioner(std::string targetName, float& sigma, std:
 
           // set sigma as the dot product of z and r
           sigma += z->get(i,j,k) * r->get(i,j,k);
+        }
+
+  return true;
+}
+
+bool GridsHolder::bodyBouy(){
+
+  return bodyBouy(default_dt);
+}
+
+bool GridsHolder::bodyBouy(float dt){
+
+  TwoStepMatrix3D* u = getTwoStepMatrix3DByName("u");
+  TwoStepMatrix3D* v = getTwoStepMatrix3DByName("v");
+  TwoStepMatrix3D* w = getTwoStepMatrix3DByName("w");
+  TwoStepMatrix3D* T = getTwoStepMatrix3DByName("T");
+
+  size_t xSize = u->xSize() - 1;
+  size_t ySize = u->ySize();
+  size_t zSize = u->zSize();
+
+  //buoy force = -alpha * s + beta(T-T_amb)
+
+  for(size_t i=0;i<=xSize;i++)
+    for(size_t j=0;j<=ySize;j++)
+      for(size_t k=0;k<=zSize;k++){
+
+          if(i==xSize){
+              u->setNew(i,j,k, u->getNew(i,j,k));
+              continue;}
+          else
+            if(j==ySize){
+                v->setNew(i,j,k, v->getNew(i,j,k) + dt*(-_at+_bt*T->getNew(i,j,k)));
+                continue;}
+            else
+              if(k==zSize){
+                  w->setNew(i,j,k, w->getNew(i,j,k));
+                  continue;}
+
+          u->setNew(i,j,k, u->getNew(i,j,k));
+          v->setNew(i,j,k, v->getNew(i,j,k) + dt*(-_at+_bt*T->getNew(i,j,k)));
+          w->setNew(i,j,k, w->getNew(i,j,k));
         }
 
   return true;

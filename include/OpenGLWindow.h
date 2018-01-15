@@ -65,6 +65,10 @@ class OpenGLWindow : public QOpenGLWindow
     //----------------------------------------------------------------------------------------------------------------------
     void initializePressure(GridsHolder* gridsHolder);
     //----------------------------------------------------------------------------------------------------------------------
+    /// @brief function to put the initial values into the temperature grid
+    //----------------------------------------------------------------------------------------------------------------------
+    void initializeTemperature(GridsHolder* gridsHolder);
+    //----------------------------------------------------------------------------------------------------------------------
     /// @brief function to load the initial values into the velocity grids (u,v,w)
     //----------------------------------------------------------------------------------------------------------------------
     void initializeVelocity(GridsHolder* gridsHolder);
@@ -139,6 +143,10 @@ class OpenGLWindow : public QOpenGLWindow
     /// @brief the default gravitational acceleration
     //----------------------------------------------------------------------------------------------------------------------
     ngl::Vec3 g = ngl::Vec3(0.0,-9.81,0);
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief the bouyancy force coefficients
+    //----------------------------------------------------------------------------------------------------------------------
+    float at = 1.0, bt = 1.0;
 
     // now project() stuff
     //----------------------------------------------------------------------------------------------------------------------
@@ -166,9 +174,13 @@ class OpenGLWindow : public QOpenGLWindow
 
     size_t m_colorOffset;
 
+    bool isPlaying = true;
+    float timerOffset = 0.0;
+    float lastPaused = 0.0;
+
     //typedef std::vector<std::vector<std::vector<std::vector<float>>>> Matrix4D;
 
-    std::unique_ptr<GLfloat[]> pressureColorData;
+    std::unique_ptr<GLfloat[]> tempColorData;
     std::unique_ptr<GLfloat[]> uColorData;
     std::unique_ptr<GLfloat[]> vColorData;
     std::unique_ptr<GLfloat[]> wColorData;
@@ -215,6 +227,11 @@ class OpenGLWindow : public QOpenGLWindow
     /// @brief data holding pressure of each cell at each frame
     //----------------------------------------------------------------------------------------------------------------------
     std::unique_ptr<FrameData> pressureFrameData;
+
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief data holding temperature of each cell at each frame
+    //----------------------------------------------------------------------------------------------------------------------
+    std::unique_ptr<FrameData> tempFrameData;
 
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief data holding velocity of each cell wall at each frame

@@ -142,10 +142,10 @@ void  OpenGLWindow::makeCubes( GLfloat _size)
 
                 //vertex color
                 for(int gc=0;gc<totalFrames;gc++){
-                    vertexData[++kColor]=pressureColorData[++kPres];//0.5 + d1*0.5/xSimSize;// + verts[i+t].m_x;
-                    vertexData[++kColor]=pressureColorData[++kPres];//0.5 + d2*0.5/ySimSize;// + verts[i+t].m_y;
-                    vertexData[++kColor]=pressureColorData[++kPres];//0.5 + d3*0.5/zSimSize;// + verts[i+t].m_z;
-                    vertexData[++kColor]=pressureColorData[++kPres];}//0.5;}
+                    vertexData[++kColor]=tempColorData[++kPres];//0.5 + d1*0.5/xSimSize;// + verts[i+t].m_x;
+                    vertexData[++kColor]=tempColorData[++kPres];//0.5 + d2*0.5/ySimSize;// + verts[i+t].m_y;
+                    vertexData[++kColor]=tempColorData[++kPres];//0.5 + d3*0.5/zSimSize;// + verts[i+t].m_z;
+                    vertexData[++kColor]=tempColorData[++kPres];}//0.5;}
 
                 //std::cout<<vertexData[k]<<"\n";
 
@@ -194,10 +194,10 @@ void OpenGLWindow::paintGL()
 
   glVertexPointer(3,GL_FLOAT,0,(void*)0);
   glNormalPointer(GL_FLOAT,0,(void*)(m_normalOffset*sizeof(GLfloat)));
-  glColorPointer(4,GL_FLOAT,0,(void*)((m_colorOffset+(m_vboSize-m_colorOffset)/totalFrames*(int(timer.elapsed()/1000.0/frameDuration)%totalFrames))*sizeof(GLfloat)));
+  glColorPointer(4,GL_FLOAT,0,(void*)((m_colorOffset+(m_vboSize-m_colorOffset)/totalFrames*(int(((isPlaying?timer.elapsed():lastPaused)-timerOffset)/1000.0/frameDuration)%totalFrames))*sizeof(GLfloat)));
   //iter++;
 
-  int xd = int(timer.elapsed()/1000.0/frameDuration)%totalFrames;
+  int xd = int(((isPlaying?timer.elapsed():lastPaused)-timerOffset)/1000.0/frameDuration)%totalFrames;
   std::cout<<xd<<"\n";
 
   //glPolygonStipple();
@@ -221,7 +221,7 @@ void OpenGLWindow::timerEvent(QTimerEvent *)
   /*
   int frameOffset = 0;//int(timer.elapsed()/(frameDuration*1000)) % pressureFrameData->numFrames();
   glBufferSubData(GL_ARRAY_BUFFER,(GLintptr)(m_colorOffset*sizeof(GLfloat)), //+pressureFrameData->frameSize()*frameOffset*sizeof(float)),
-                  pressureFrameData->frameSize()*4*3*2*6*sizeof(GLfloat)*10,&((pressureColorData.get())[frameOffset*4*3*2*6]));
+                  pressureFrameData->frameSize()*4*3*2*6*sizeof(GLfloat)*10,&((tempColorData.get())[frameOffset*4*3*2*6]));
   update();*/
 }
 
@@ -230,6 +230,34 @@ void OpenGLWindow::keyPressEvent(QKeyEvent *_event)
   switch (_event->key())
     {
     case Qt::Key_Escape : QApplication::exit(EXIT_SUCCESS); break;
+    case ' ' : {
+        //pause or play
+        if(isPlaying){
+            isPlaying = false;
+            lastPaused = timer.elapsed();
+          }
+        else{
+            isPlaying = true;
+            timerOffset += timer.elapsed() - lastPaused;
+          }
+        break;
+      }
+    case Qt::Key_Left : {
+        if(isPlaying){
+            isPlaying = false;
+            lastPaused = timer.elapsed();
+          }
+        timerOffset += frameDuration*1000;
+        break;
+      }
+    case Qt::Key_Right : {
+        if(isPlaying){
+            isPlaying = false;
+            lastPaused = timer.elapsed();
+          }
+        timerOffset -= frameDuration*1000;
+        break;
+      }
     }
 }
 
@@ -273,6 +301,27 @@ void OpenGLWindow::initializePressure(GridsHolder *gridsHolder){
       for(size_t k=0;k<z_Size;k++)
 
         p->setOld(i,j,k,std::fabs(((x_Size*1.0)/2.0-i)/x_Size));*/
+}
+
+void OpenGLWindow::initializeTemperature(GridsHolder *gridsHolder){
+
+  // here we will populate the pressure grid with its initial values
+
+  TwoStepMatrix3D* T = gridsHolder->getTwoStepMatrix3DByName("T");
+
+  size_t x_Size = T->xSize();
+  size_t y_Size = T->ySize();
+  size_t z_Size = T->zSize();
+
+  T->setOld(x_Size/2, y_Size/2 ,z_Size/2, 10.0);
+  T->setOld(x_Size/2+1, y_Size/2 ,z_Size/2, 10.0);
+  T->setOld(x_Size/2, y_Size/2+1 ,z_Size/2, 10.0);
+  T->setOld(x_Size/2+1, y_Size/2+1 ,z_Size/2, 10.0);
+  T->setOld(x_Size/2, y_Size/2 ,z_Size/2+1, 10.0);
+  T->setOld(x_Size/2+1, y_Size/2 ,z_Size/2+1, 10.0);
+  T->setOld(x_Size/2, y_Size/2+1 ,z_Size/2+1, 10.0);
+  T->setOld(x_Size/2+1, y_Size/2+1 ,z_Size/2+1, 10.0);
+
 }
 
 void OpenGLWindow::initializeVelocity(GridsHolder *gridsHolder){
@@ -343,6 +392,7 @@ void OpenGLWindow::bake(){
   gridsToMake.push_back(std::unique_ptr<GridTuple>(new GridTuple("v",GRID_3D_TWOSTEP,xSimSize,ySimSize+1,zSimSize)));
   gridsToMake.push_back(std::unique_ptr<GridTuple>(new GridTuple("w",GRID_3D_TWOSTEP,xSimSize,ySimSize,zSimSize+1)));
   gridsToMake.push_back(std::unique_ptr<GridTuple>(new GridTuple("p",GRID_3D_TWOSTEP,xSimSize,ySimSize,zSimSize)));
+  gridsToMake.push_back(std::unique_ptr<GridTuple>(new GridTuple("T",GRID_3D_TWOSTEP,xSimSize,ySimSize,zSimSize)));
   gridsToMake.push_back(std::unique_ptr<GridTuple>(new GridTuple("r",GRID_3D,xSimSize,ySimSize,zSimSize)));
   gridsToMake.push_back(std::unique_ptr<GridTuple>(new GridTuple("z",GRID_3D,xSimSize,ySimSize,zSimSize)));
   gridsToMake.push_back(std::unique_ptr<GridTuple>(new GridTuple("s",GRID_3D,xSimSize,ySimSize,zSimSize)));
@@ -351,21 +401,24 @@ void OpenGLWindow::bake(){
   gridsToMake.push_back(std::unique_ptr<GridTuple>(new GridTuple("q",GRID_3D,xSimSize,ySimSize,zSimSize)));
   gridsToMake.push_back(std::unique_ptr<GridTuple>(new GridTuple("A",GRID_3D_7PL,xSimSize,ySimSize,zSimSize)));
 
-  std::unique_ptr<GridsHolder> grids = std::unique_ptr<GridsHolder>(new GridsHolder(std::move(gridsToMake), dx, dt, tol, maxIterations, rho, g));
+  std::unique_ptr<GridsHolder> grids = std::unique_ptr<GridsHolder>(new GridsHolder(std::move(gridsToMake), dx, dt, tol, maxIterations, rho, g, at, bt));
 
   //addPressureFrameData();
   //addVelocityFrameData();
   size_t currentFrame = 0;
 
-  initializePressure(grids.get());
+  //initializePressure(grids.get());
   initializeVelocity(grids.get());
+  initializeTemperature(grids.get());
 
   pressureFrameData = std::unique_ptr<FrameData>(new FrameData(xSimSize,ySimSize,zSimSize));
+  tempFrameData = std::unique_ptr<FrameData>(new FrameData(xSimSize,ySimSize,zSimSize));
   uFrameData = std::unique_ptr<FrameData>(new FrameData(xSimSize+1,ySimSize,zSimSize));
   vFrameData = std::unique_ptr<FrameData>(new FrameData(xSimSize,ySimSize+1,zSimSize));
   wFrameData = std::unique_ptr<FrameData>(new FrameData(xSimSize,ySimSize,zSimSize+1));
 
   pressureFrameData->addFrame(grids.get(),"p");
+  tempFrameData->addFrame(grids.get(),"T");
   uFrameData->addFrame(grids.get(),"u");
   vFrameData->addFrame(grids.get(),"v");
   wFrameData->addFrame(grids.get(),"w");
@@ -385,7 +438,7 @@ void OpenGLWindow::bake(){
 
       // only need information for two consectutive time steps
       // ADVECT RUNS WITH [0] AS OLD, BODY REWRITES [1], PROJECT RUNS WITH [1] AS OLD, REPEAT
-      grids.get()->advect({"u","v","w","p"}, tempDt);
+      grids.get()->advect({"u","v","w","p","T"}, tempDt);
 
       // body function is just updating the velocities to account for gravity
       grids.get()->body(tempDt);
@@ -395,6 +448,7 @@ void OpenGLWindow::bake(){
 
       if(makeFrame){
           pressureFrameData->addFrame(grids.get(),"p");
+          tempFrameData->addFrame(grids.get(),"T");
           uFrameData->addFrame(grids.get(),"u");
           vFrameData->addFrame(grids.get(),"v");
           wFrameData->addFrame(grids.get(),"w");
@@ -408,7 +462,7 @@ void OpenGLWindow::bake(){
 
   grids.reset();
 
-  pressureColorData = pressureFrameData->dataToGLfloat(FrameData::WHOLE_CUBE);
+  tempColorData = tempFrameData->dataToGLfloat(FrameData::WHOLE_CUBE);
   //uColorData = uFrameData->dataToGLfloat(FrameData::CUBE_WALL_X);
   //vColorData = vFrameData->dataToGLfloat(FrameData::CUBE_WALL_Y);
   //wColorData = wFrameData->dataToGLfloat(FrameData::CUBE_WALL_Z);
@@ -419,6 +473,9 @@ void OpenGLWindow::bake(){
 
   startTimer(frameDuration*1000);
   timer.start();
+
+  lastPaused = 0.0;
+  isPlaying = true;
 }
 
 size_t OpenGLWindow::FrameData::xSize(){
