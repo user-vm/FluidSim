@@ -463,9 +463,6 @@ bool GridsHolder::advect(std::vector<std::string> gridsToAdvectNames, float dt)
                   izp = floor(zp/dx - 0.5);
                   az = zp/dx - (izp + 0.5);
 
-                  if((ix*y_Size+iy)*z_Size+iz==555 && cName=="p")
-                    std::cout<<"nacho ";
-
                   newC = 0;
 
                   for(size_t i=0;i<2;i++)
@@ -477,9 +474,6 @@ bool GridsHolder::advect(std::vector<std::string> gridsToAdvectNames, float dt)
                             newC += (i?ax:(1-ax))*(j?ay:(1-ay))*(k?az:(1-az)) * c->getOld(ixp+i,iyp+j,izp+k);
 
                   c->setNew(ix,iy,iz,newC);
-
-                  if((ix*y_Size+iy)*z_Size+iz==555 && cName=="p")
-                    std::cout<<"cheese\n";
                 }
         }
       else{
@@ -591,7 +585,7 @@ bool GridsHolder::project(float dt, float tol, size_t maxIterations)
     return false;
 
   Matrix3D* z = getMatrix3DByName("z");
-  Matrix3D* d = getMatrix3DByName("d");
+  //Matrix3D* d = getMatrix3DByName("d");
   Matrix3D* s = getMatrix3DByName("s");
   Matrix3D* r = getMatrix3DByName("r");
   Matrix3D* precon = getMatrix3DByName("precon");
@@ -599,7 +593,7 @@ bool GridsHolder::project(float dt, float tol, size_t maxIterations)
 
   SevenPointLagrangianMatrix* A = getSevenPointLagrangianMatrixByName("A");
 
-  std::vector<std::pair<Matrix3D*,std::string>> utilityMatrixList = {std::make_pair(d,"d"),
+  std::vector<std::pair<Matrix3D*,std::string>> utilityMatrixList = {//std::make_pair(d,"d"),
                                                                      std::make_pair(z,"z"),
                                                                      std::make_pair(s,"s"),
                                                                      std::make_pair(r,"r"),
@@ -639,22 +633,21 @@ bool GridsHolder::project(float dt, float tol, size_t maxIterations)
     for(size_t j=0;j<ySize;j++)
       for(size_t k=0;k<zSize;k++){
 
-        d->set(i, j, k, (u->getOld(i,j,k) - u->getOld(i+1,j,k) + v->getOld(i,j,k) - v->getOld(i,j+1,k) + w->getOld(i,j,k) - w->getOld(i,j,k+1)/2));
-        r->set(i,j,k, d->get(i,j,k));
+        r->set(i, j, k, (u->getOld(i,j,k) - u->getOld(i+1,j,k) + v->getOld(i,j,k) - v->getOld(i,j+1,k) + w->getOld(i,j,k) - w->getOld(i,j,k+1)/2));
+        //r->set(i,j,k, d->get(i,j,k));
         if(abs(r->get(i,j,k))>tol)
           breakIteration = false;
-        p->setNew(i,j,k, 0);
+        //p->setNew(i,j,k, 0);
   }
 
   size_t it;
 
   if(breakIteration)
     it = maxIterations + 2; // give it a value that will skip the loop, but also lets us know that maxIterations was not truly exceeded
-  else
+  else{
     it = 0;
-
-  //first we apply the preconditioner
-  applyPreconditioner("r",sigma);
+    //first we apply the preconditioner
+    applyPreconditioner("r",sigma);}
 
   // now loop
 
@@ -700,14 +693,12 @@ bool GridsHolder::project(float dt, float tol, size_t maxIterations)
       for(size_t k=0;k<zSize;k++){
         u->setNew(i,j,k, -dt/_density * (p->getNew(i+1,j,k) - p->getNew(i,j,k)) / dx + u->getOld(i,j,k));
         v->setNew(i,j,k, -dt/_density * (p->getNew(i,j+1,k) - p->getNew(i,j,k)) / dx + v->getOld(i,j,k));
-        w->setNew(i,j,k, -dt/_density * (p->getNew(i,j,k+1) - p->getNew(i,j,k)) / dx + v->getOld(i,j,k));
+        w->setNew(i,j,k, -dt/_density * (p->getNew(i,j,k+1) - p->getNew(i,j,k)) / dx + w->getOld(i,j,k));
       }
 
-  // swap grids back to prepare for next iteration; this means frames are drawn using the old components
-  u->swap();
-  v->swap();
-  w->swap();
-  p->swap();
+  // don't -> // swap grids back to prepare for next iteration; this means frames are drawn using the old components
+
+  std::cout<<it<<"/n";
 
   if(it < maxIterations || it == maxIterations + 2)
     return true;

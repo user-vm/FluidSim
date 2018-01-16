@@ -49,6 +49,11 @@ class OpenGLWindow : public QOpenGLWindow
     /// @returns a pointer to the allocated VBO
     void  makeCubes(GLfloat _size);
     //----------------------------------------------------------------------------------------------------------------------
+    /// @brief a simple draw grid function
+    /// @param[in] _size the size of the grid (width and height)
+    /// @returns a pointer to the allocated VBO
+    void  makePoints(GLfloat _size);
+    //----------------------------------------------------------------------------------------------------------------------
     /// @brief function to add new animation frame of grid pressure data
     //----------------------------------------------------------------------------------------------------------------------
     void addPressureFrameData();
@@ -86,8 +91,10 @@ class OpenGLWindow : public QOpenGLWindow
     GLint m_vboSize=0;
     /// @brief size of the subVBO corresponding to a single cube
     GLint m_cubeSubVBOSize=0;
+    /// @brief size of the subVBO corresponding to a single point (when doing the GL_POINTS render)
+    GLint m_pointSubVBOSize=0;
     /// @brief size of the simulation in grid cells in x, y and z, respectively
-    GLint xSimSize=30, ySimSize=30, zSimSize=30;
+    GLint xSimSize=20, ySimSize=20, zSimSize=20;
     /// @brief ID of shader program
     GLint shaderProgramID=0;
     //----------------------------------------------------------------------------------------------------------------------
@@ -173,6 +180,10 @@ class OpenGLWindow : public QOpenGLWindow
     /// @brief grid cell size
     //----------------------------------------------------------------------------------------------------------------------
     float dx;
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief size of points for display
+    //----------------------------------------------------------------------------------------------------------------------
+    float pointSize;
 
     size_t m_normalOffset;
 
@@ -194,7 +205,7 @@ class OpenGLWindow : public QOpenGLWindow
     class FrameData{
 
     public:
-      enum GLfloatTransformationMethod {WHOLE_CUBE = 0, CUBE_WALL_X = 1, CUBE_WALL_Y = 2, CUBE_WALL_Z = 3};
+      enum GLfloatTransformationMethod {WHOLE_CUBE = 0, CUBE_WALL_X = 1, CUBE_WALL_Y = 2, CUBE_WALL_Z = 3, CENTER_POINTS = 4};
 
       FrameData(size_t xSize, size_t ySize, size_t zSize);
       //~FrameData();
