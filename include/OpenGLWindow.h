@@ -69,6 +69,10 @@ class OpenGLWindow : public QOpenGLWindow
     //----------------------------------------------------------------------------------------------------------------------
     void initializeTemperature(GridsHolder* gridsHolder);
     //----------------------------------------------------------------------------------------------------------------------
+    /// @brief function to put the initial values into the temperature grid
+    //----------------------------------------------------------------------------------------------------------------------
+    void initializeSmokeConcentration(GridsHolder* gridsHolder);
+    //----------------------------------------------------------------------------------------------------------------------
     /// @brief function to load the initial values into the velocity grids (u,v,w)
     //----------------------------------------------------------------------------------------------------------------------
     void initializeVelocity(GridsHolder* gridsHolder);
@@ -83,7 +87,7 @@ class OpenGLWindow : public QOpenGLWindow
     /// @brief size of the subVBO corresponding to a single cube
     GLint m_cubeSubVBOSize=0;
     /// @brief size of the simulation in grid cells in x, y and z, respectively
-    GLint xSimSize=10, ySimSize=10, zSimSize=10;
+    GLint xSimSize=30, ySimSize=30, zSimSize=30;
     /// @brief ID of shader program
     GLint shaderProgramID=0;
     //----------------------------------------------------------------------------------------------------------------------
@@ -138,7 +142,7 @@ class OpenGLWindow : public QOpenGLWindow
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief the total time to simulate
     //----------------------------------------------------------------------------------------------------------------------
-    float totalSimTime=5.0;
+    float totalSimTime=2.0;
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief the default gravitational acceleration
     //----------------------------------------------------------------------------------------------------------------------
@@ -146,7 +150,7 @@ class OpenGLWindow : public QOpenGLWindow
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief the bouyancy force coefficients
     //----------------------------------------------------------------------------------------------------------------------
-    float at = 1.0, bt = 1.0;
+    float at = 1, bt = 2;
 
     // now project() stuff
     //----------------------------------------------------------------------------------------------------------------------
@@ -181,6 +185,7 @@ class OpenGLWindow : public QOpenGLWindow
     //typedef std::vector<std::vector<std::vector<std::vector<float>>>> Matrix4D;
 
     std::unique_ptr<GLfloat[]> tempColorData;
+    std::unique_ptr<GLfloat[]> scColorData;
     std::unique_ptr<GLfloat[]> uColorData;
     std::unique_ptr<GLfloat[]> vColorData;
     std::unique_ptr<GLfloat[]> wColorData;
@@ -232,6 +237,11 @@ class OpenGLWindow : public QOpenGLWindow
     /// @brief data holding temperature of each cell at each frame
     //----------------------------------------------------------------------------------------------------------------------
     std::unique_ptr<FrameData> tempFrameData;
+
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief data holding smoke concentration of each cell at each frame
+    //----------------------------------------------------------------------------------------------------------------------
+    std::unique_ptr<FrameData> scFrameData;
 
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief data holding velocity of each cell wall at each frame

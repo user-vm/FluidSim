@@ -568,7 +568,6 @@ bool GridsHolder::project(float dt, float tol, size_t maxIterations)
   TwoStepMatrix3D* v = getTwoStepMatrix3DByName("v");
   TwoStepMatrix3D* w = getTwoStepMatrix3DByName("w");
   TwoStepMatrix3D* p = getTwoStepMatrix3DByName("p");
-  TwoStepMatrix3D* T = getTwoStepMatrix3DByName("T");
 
   bool objectMissing = false;
 
@@ -709,7 +708,6 @@ bool GridsHolder::project(float dt, float tol, size_t maxIterations)
   v->swap();
   w->swap();
   p->swap();
-  T->swap();
 
   if(it < maxIterations || it == maxIterations + 2)
     return true;
@@ -854,43 +852,34 @@ bool GridsHolder::applyPreconditioner(std::string targetName, float& sigma, std:
   return true;
 }
 
-bool GridsHolder::bodyBouy(){
+bool GridsHolder::bodyBuoy(){
 
-  return bodyBouy(default_dt);
+  return bodyBuoy(default_dt);
 }
 
-bool GridsHolder::bodyBouy(float dt){
+bool GridsHolder::bodyBuoy(float dt){
 
-  TwoStepMatrix3D* u = getTwoStepMatrix3DByName("u");
   TwoStepMatrix3D* v = getTwoStepMatrix3DByName("v");
-  TwoStepMatrix3D* w = getTwoStepMatrix3DByName("w");
   TwoStepMatrix3D* T = getTwoStepMatrix3DByName("T");
+  TwoStepMatrix3D* sc = getTwoStepMatrix3DByName("sc");
 
-  size_t xSize = u->xSize() - 1;
-  size_t ySize = u->ySize();
-  size_t zSize = u->zSize();
+  size_t xSize = v->xSize();
+  size_t ySize = v->ySize() - 1;
+  size_t zSize = v->zSize();
 
   //buoy force = -alpha * s + beta(T-T_amb)
 
-  for(size_t i=0;i<=xSize;i++)
+  for(size_t i=0;i<xSize;i++)
     for(size_t j=0;j<=ySize;j++)
-      for(size_t k=0;k<=zSize;k++){
+      for(size_t k=0;k<zSize;k++){
 
-          if(i==xSize){
-              u->setNew(i,j,k, u->getNew(i,j,k));
-              continue;}
+        if(j==ySize)
+          v->setNew(i,j,k, v->getNew(i,j,k) + dt*(-_at*(sc->getNew(i,j-1,k)+sc->getOutsideValue())+_bt*(T->getNew(i,j-1,k)+T->getOutsideValue()))/2.0); //average T, since u,v,w at cell faces and T at center
+        else
+          if(j==0)
+            v->setNew(i,j,k, v->getNew(i,j,k) + dt*(-_at*(sc->getNew(i,j,k)+sc->getOutsideValue())+_bt*(T->getNew(i,j,k)+T->getOutsideValue()))/2.0);
           else
-            if(j==ySize){
-                v->setNew(i,j,k, v->getNew(i,j,k) + dt*(-_at+_bt*T->getNew(i,j,k)));
-                continue;}
-            else
-              if(k==zSize){
-                  w->setNew(i,j,k, w->getNew(i,j,k));
-                  continue;}
-
-          u->setNew(i,j,k, u->getNew(i,j,k));
-          v->setNew(i,j,k, v->getNew(i,j,k) + dt*(-_at+_bt*T->getNew(i,j,k)));
-          w->setNew(i,j,k, w->getNew(i,j,k));
+            v->setNew(i,j,k, v->getNew(i,j,k) + dt*(-_at*(sc->getNew(i,j,k)+sc->getNew(i,j-1,k))+_bt*(T->getNew(i,j,k)+T->getNew(i,j-1,k)))/2.0);
         }
 
   return true;

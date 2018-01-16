@@ -229,8 +229,8 @@ public:
   bool body();
   bool body(float dt);
 
-  bool bodyBouy();
-  bool bodyBouy(float dt);
+  bool bodyBuoy();
+  bool bodyBuoy(float dt);
 
   // this might not be good
   // template<class T>
