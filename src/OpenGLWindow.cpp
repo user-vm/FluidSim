@@ -141,10 +141,10 @@ void  OpenGLWindow::makeCubes( GLfloat _size)
 
                 //vertex color
                 for(int gc=0;gc<totalFrames;gc++){
-                    vertexData[m_vboSize-4-(++kColor)]=scColorData[++kPres];//0.5 + d1*0.5/xSimSize;// + verts[i+t].m_x;
-                    vertexData[m_vboSize-2-(++kColor)]=scColorData[++kPres];//0.5 + d2*0.5/ySimSize;// + verts[i+t].m_y;
-                    vertexData[m_vboSize-(++kColor)]=scColorData[++kPres];//0.5 + d3*0.5/zSimSize;// + verts[i+t].m_z;
-                    vertexData[m_vboSize+2-(++kColor)]=scColorData[++kPres];}//0.5;}
+                    vertexData[m_vboSize-4-(++kColor)]=mainColorData[++kPres];//0.5 + d1*0.5/xSimSize;// + verts[i+t].m_x;
+                    vertexData[m_vboSize-2-(++kColor)]=mainColorData[++kPres];//0.5 + d2*0.5/ySimSize;// + verts[i+t].m_y;
+                    vertexData[m_vboSize-(++kColor)]=mainColorData[++kPres];//0.5 + d3*0.5/zSimSize;// + verts[i+t].m_z;
+                    vertexData[m_vboSize+2-(++kColor)]=mainColorData[++kPres];}//0.5;}
 
                 //std::cout<<vertexData[k]<<"\n";
 
@@ -208,17 +208,17 @@ void OpenGLWindow::makePoints(GLfloat _size)
 
             //add vertices in three by three, because each vertex in a tri has the same normal vector
             //if(gc==0){
-            vertexData[m_colorOffset-3-(++kVertex)]=(d1*1 - xSimSize/2.0)*_size;
-            vertexData[m_colorOffset-1-(++kVertex)]=(d2*1 - ySimSize/2.0)*_size;
-            vertexData[m_colorOffset+1-(++kVertex)]=(d3*1 - zSimSize/2.0)*_size;//}
+            vertexData[++kVertex]=(d1*1 - xSimSize/2.0)*_size;
+            vertexData[++kVertex]=(d2*1 - ySimSize/2.0)*_size;
+            vertexData[++kVertex]=(d3*1 - zSimSize/2.0)*_size;//}
 
             //vertex color
-            //std::cout<<"("<<scColorData[kPres-4]<<" "<<scColorData[kPres-3]<<" "<<scColorData[kPres-2]<<" "<<scColorData[kPres-1]<<") ";
+            //std::cout<<"("<<mainColorData[kPres-4]<<" "<<mainColorData[kPres-3]<<" "<<mainColorData[kPres-2]<<" "<<mainColorData[kPres-1]<<") ";
             for(int gc=0;gc<totalFrames;gc++){
-                vertexData[m_vboSize-4-(++kColor)]=scColorData[++kPres];//0.5 + d1*0.5/xSimSize;// + verts[i+t].m_x;
-                vertexData[m_vboSize-2-(++kColor)]=scColorData[++kPres];//0.5 + d2*0.5/ySimSize;// + verts[i+t].m_y;
-                vertexData[m_vboSize-(++kColor)]=scColorData[++kPres];//0.5 + d3*0.5/zSimSize;// + verts[i+t].m_z;
-                vertexData[m_vboSize+2-(++kColor)]=scColorData[++kPres];}//0.5;}
+                vertexData[++kColor]=mainColorData[++kPres];//0.5 + d1*0.5/xSimSize;// + verts[i+t].m_x;
+                vertexData[++kColor]=mainColorData[++kPres];//0.5 + d2*0.5/ySimSize;// + verts[i+t].m_y;
+                vertexData[++kColor]=mainColorData[++kPres];//0.5 + d3*0.5/zSimSize;// + verts[i+t].m_z;
+                vertexData[++kColor]=mainColorData[++kPres];}//0.5;}
 
         //std::cout<<"\n";
         }
@@ -271,7 +271,7 @@ void OpenGLWindow::paintGL()
   //iter++;
 
   int xd = int(((isPlaying?timer.elapsed():lastPaused)-timerOffset)/1000.0/frameDuration)%totalFrames;
-  std::cout<<xd<<" ";
+  std::cout<<xd<<"\n";
 
   //glPolygonStipple();
 
@@ -294,7 +294,7 @@ void OpenGLWindow::timerEvent(QTimerEvent *)
   /*
   int frameOffset = 0;//int(timer.elapsed()/(frameDuration*1000)) % pressureFrameData->numFrames();
   glBufferSubData(GL_ARRAY_BUFFER,(GLintptr)(m_colorOffset*sizeof(GLfloat)), //+pressureFrameData->frameSize()*frameOffset*sizeof(float)),
-                  pressureFrameData->frameSize()*4*3*2*6*sizeof(GLfloat)*10,&((scColorData.get())[frameOffset*4*3*2*6]));
+                  pressureFrameData->frameSize()*4*3*2*6*sizeof(GLfloat)*10,&((mainColorData.get())[frameOffset*4*3*2*6]));
   update();*/
 }
 
@@ -476,6 +476,23 @@ void OpenGLWindow::bake(){
 
   float dx = cubeSize;
 
+  ngl::Vec3 gDep = g;
+
+  switch(fluidType){
+    case WATER:{
+        at = 0.0;
+        bt = 0.0;
+        gDep = g;
+        break;
+      }
+    case SMOKE:{
+        gDep = 0.0;
+        break;
+      }
+    }
+
+  //^^check if it works (break statement position)^^
+
   float simTime = 0.0;
 
   // need to initialize matrices
@@ -508,7 +525,7 @@ void OpenGLWindow::bake(){
   gridsToMake.push_back(std::unique_ptr<GridTuple>(new GridTuple("q",GRID_3D,xSimSize,ySimSize,zSimSize)));
   gridsToMake.push_back(std::unique_ptr<GridTuple>(new GridTuple("A",GRID_3D_7PL,xSimSize,ySimSize,zSimSize)));
 
-  std::unique_ptr<GridsHolder> grids = std::unique_ptr<GridsHolder>(new GridsHolder(std::move(gridsToMake), dx, dt, tol, maxIterations, rho, g, at, bt));
+  std::unique_ptr<GridsHolder> grids = std::unique_ptr<GridsHolder>(new GridsHolder(std::move(gridsToMake), dx, dt, tol, maxIterations, rho, gDep, at, bt));
 
   //addPressureFrameData();
   //addVelocityFrameData();
@@ -521,14 +538,19 @@ void OpenGLWindow::bake(){
 
   //pressureFrameData = std::unique_ptr<FrameData>(new FrameData(xSimSize,ySimSize,zSimSize));
   //tempFrameData = std::unique_ptr<FrameData>(new FrameData(xSimSize,ySimSize,zSimSize));
-  scFrameData = std::unique_ptr<FrameData>(new FrameData(xSimSize,ySimSize,zSimSize));
+  mainFrameData = std::unique_ptr<FrameData>(new FrameData(xSimSize,ySimSize,zSimSize));
   //uFrameData = std::unique_ptr<FrameData>(new FrameData(xSimSize+1,ySimSize,zSimSize));
   //vFrameData = std::unique_ptr<FrameData>(new FrameData(xSimSize,ySimSize+1,zSimSize));
   //wFrameData = std::unique_ptr<FrameData>(new FrameData(xSimSize,ySimSize,zSimSize+1));
 
   //pressureFrameData->addFrame(grids.get(),"p");
   //tempFrameData->addFrame(grids.get(),"T");
-  scFrameData->addFrame(grids.get(),"sc");
+  if(fluidType==WATER){
+    mainFrameData->addFrame(grids.get(),"p");
+  }
+  else{
+    mainFrameData->addFrame(grids.get(),"sc");
+  }
   //uFrameData->addFrame(grids.get(),"u");
   //vFrameData->addFrame(grids.get(),"v");
   //wFrameData->addFrame(grids.get(),"w");
@@ -539,6 +561,10 @@ void OpenGLWindow::bake(){
 
   while(simTime<=totalSimTime-dt){
 
+      TwoStepMatrix3D* p;
+      TwoStepMatrix3D* T;
+      TwoStepMatrix3D* sc;
+
       bool makeFrame = false;
 
       if(size_t((simTime + dt)/frameDuration) > currentFrame){
@@ -548,36 +574,42 @@ void OpenGLWindow::bake(){
 
       // only need information for two consectutive time steps
       // ADVECT RUNS WITH [0] AS OLD, BODY REWRITES [1], PROJECT RUNS WITH [1] AS OLD, REPEAT
-      grids.get()->advect({"u","v","w","p","T","sc"}, tempDt); //sc is smoke concentration ("s" in notes)
 
       // body function is just updating the velocities to account for gravity
-      grids.get()->bodyBuoy(tempDt);
+      if(fluidType==WATER){
+          grids.get()->advect({"u","v","w","p"}, tempDt);
+          grids.get()->body(tempDt);
+          p = grids.get()->getTwoStepMatrix3DByName("p");
+          grids.get()->project(tempDt);
+          simTime += tempDt;
+          if(makeFrame){
+              mainFrameData->addFrame(grids.get(),"p");
+              currentFrame++;
+              std::cout<<currentFrame<<"/"<<totalSimTime/frameDuration<<"\n";
+            }
+      }
+      else{
+          grids.get()->advect({"u","v","w","p","T","sc"}, tempDt);
+          grids.get()->bodyBuoy(tempDt);
+          T = grids.get()->getTwoStepMatrix3DByName("T");
+          sc = grids.get()->getTwoStepMatrix3DByName("sc");
+          T->swap();
+          sc->swap();
+          grids.get()->project(tempDt);
+          simTime += tempDt;
+          if(makeFrame){
+              mainFrameData->addFrame(grids.get(),"sc");
+              currentFrame++;
+              std::cout<<currentFrame<<"/"<<totalSimTime/frameDuration<<"\n";
+            }
+      }
 
       //TwoStepMatrix3D* u = grids.get()->getTwoStepMatrix3DByName("u");
       //TwoStepMatrix3D* v = grids.get()->getTwoStepMatrix3DByName("v");
       //TwoStepMatrix3D* w = grids.get()->getTwoStepMatrix3DByName("w");
       //TwoStepMatrix3D* p = grids.get()->getTwoStepMatrix3DByName("p");
-      TwoStepMatrix3D* T = grids.get()->getTwoStepMatrix3DByName("T");
-      TwoStepMatrix3D* sc = grids.get()->getTwoStepMatrix3DByName("sc");
-
-      //uncomment when not calling project
-      T->swap();
-      sc->swap();
-
-      grids.get()->project(tempDt);
-      simTime += tempDt;
-
-      if(makeFrame){
-          //pressureFrameData->addFrame(grids.get(),"p");
-          //tempFrameData->addFrame(grids.get(),"T");
-          scFrameData->addFrame(grids.get(),"sc");
-          //uFrameData->addFrame(grids.get(),"u");
-          //vFrameData->addFrame(grids.get(),"v");
-          //wFrameData->addFrame(grids.get(),"w");
-
-          currentFrame++;
-          std::cout<<currentFrame<<"/"<<totalSimTime/frameDuration<<"\n";
-        }
+      //TwoStepMatrix3D* T = grids.get()->getTwoStepMatrix3DByName("T");
+      //TwoStepMatrix3D* sc = grids.get()->getTwoStepMatrix3DByName("sc");
 
       tempDt = dt;
     }
@@ -585,7 +617,7 @@ void OpenGLWindow::bake(){
   grids.reset();
 
   //tempColorData = tempFrameData->dataToGLfloat(FrameData::WHOLE_CUBE);
-  scColorData = scFrameData->dataToGLfloat(FrameData::CENTER_POINTS);
+  mainColorData = mainFrameData->dataToGLfloat(FrameData::CENTER_POINTS);
   //uColorData = uFrameData->dataToGLfloat(FrameData::CUBE_WALL_X);
   //vColorData = vFrameData->dataToGLfloat(FrameData::CUBE_WALL_Y);
   //wColorData = wFrameData->dataToGLfloat(FrameData::CUBE_WALL_Z);

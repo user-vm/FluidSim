@@ -6,6 +6,8 @@
 #include <ngl/Vec3.h>
 #include "Bake.h"
 
+enum FluidType {SMOKE=0, WATER=1, MIX=2};
+
 class OpenGLWindow : public QOpenGLWindow
 {
     // need to tell Qt to run the MOC
@@ -184,6 +186,10 @@ class OpenGLWindow : public QOpenGLWindow
     /// @brief size of points for display
     //----------------------------------------------------------------------------------------------------------------------
     float pointSize;
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief type of fluid (water or smoke)
+    //----------------------------------------------------------------------------------------------------------------------
+    FluidType fluidType = WATER;
 
     size_t m_normalOffset;
 
@@ -200,6 +206,7 @@ class OpenGLWindow : public QOpenGLWindow
     std::unique_ptr<GLfloat[]> uColorData;
     std::unique_ptr<GLfloat[]> vColorData;
     std::unique_ptr<GLfloat[]> wColorData;
+    std::unique_ptr<GLfloat[]> mainColorData;
 
     // something that can be fed into the shader
     class FrameData{
@@ -253,6 +260,11 @@ class OpenGLWindow : public QOpenGLWindow
     /// @brief data holding smoke concentration of each cell at each frame
     //----------------------------------------------------------------------------------------------------------------------
     std::unique_ptr<FrameData> scFrameData;
+
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief data holding data to be displayed (pressure for water, concentration for smoke)
+    //----------------------------------------------------------------------------------------------------------------------
+    std::unique_ptr<FrameData> mainFrameData;
 
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief data holding velocity of each cell wall at each frame
