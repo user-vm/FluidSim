@@ -32,6 +32,10 @@ class OpenGLWindow : public QOpenGLWindow
     /// this is only called one time, just after we have a valid GL context use this to init any global GL elements
     //----------------------------------------------------------------------------------------------------------------------
     void initializeGL();
+
+    GLuint LoadShaders(const char * vertex_file_path,const char * fragment_file_path);
+
+    GLuint programID;
   private:
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief event called by the timer to allow use to re-draw / animate
@@ -288,6 +292,9 @@ class OpenGLWindow : public QOpenGLWindow
 
     //total number of frames, calculate later
     size_t totalFrames = 0;
+
+    // This will identify our vertex buffer
+    GLuint vertexbuffer;
 };
 
 #endif

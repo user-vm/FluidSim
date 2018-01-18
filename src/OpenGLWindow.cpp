@@ -11,6 +11,8 @@
 #include <ngl/Vec3.h>
 #include <QElapsedTimer>
 #include <cmath>
+#include <fstream>
+#include <sstream>
 
 constexpr float cubeSize=0.05;
 
@@ -230,76 +232,158 @@ void OpenGLWindow::makePoints(GLfloat _size)
     std::cout<<"kColor = "<<kColor<<"; kVertex = "<<kVertex<<"\n";
 
     qint64 kSolid=m_fluidVboSize-1;
-
+    /*
     for(size_t d1=0;d1<m_solidVboSize;d1++)
-      vertexData[++kSolid] = solidFacesData[d1];
+      vertexData[++kSolid] = solidFacesData[d1];*/
 
     // now we will create our VBO first we need to ask GL for an Object ID
 
-    for(size_t d1=0;d1<kVertex;d1++)
-      std::cout<<vertexData[d1]<<" ";
+    /*for(size_t d1=0;d1<kVertex;d1++)
+      std::cout<<vertexData[d1]<<" ";*/
 
-    glGenBuffers(1, &m_vboPointer);
-    // now we bind this ID to an Array buffer
-    glBindBuffer(GL_ARRAY_BUFFER, m_vboPointer);
-    // finally we stuff our data into the array object
-    // First we tell GL it's an array buffer
-    // then the number of bytes we are storing (need to tell it's a sizeof(FLOAT)
-    // then the pointer to the actual data
-    // Then how we are going to draw it (in this case Statically as the data will not change)
-    //glBufferData(GL_ARRAY_BUFFER, kColor*sizeof(GL_FLOAT) , vertexData.get(), GL_DYNAMIC_DRAW);
-    glBufferData(GL_ARRAY_BUFFER, m_vboSize*sizeof(GL_FLOAT) , vertexData.get(), GL_DYNAMIC_DRAW);
+    // Dark blue background
+    glClearColor(0.0f, 0.0f, 0.4f, 0.0f);
+
+    // Create and compile our GLSL program from the shaders
+    programID = LoadShaders( "shaders/SimpleVertexShader.glsl", "shaders/SimpleFragmentShader.glsl" );
+
+    GLuint VertexArrayID;
+    glGenVertexArrays(1, &VertexArrayID);
+    glBindVertexArray(VertexArrayID);
+
+    // Generate 1 buffer, put the resulting identifier in vertexbuffer
+    glGenBuffers(1, &vertexbuffer);
+    // The following commands will talk about our 'vertexbuffer' buffer
+    glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
+    // Give our vertices to OpenGL.
+    glBufferData(GL_ARRAY_BUFFER, solidFacesData.size()*sizeof(GLfloat), solidFacesData.data(), GL_STATIC_DRAW);
 }
+
+// from opengl-tutorial.org
+GLuint OpenGLWindow::LoadShaders(const char * vertex_file_path,const char * fragment_file_path){
+
+	// Create the shaders
+	GLuint VertexShaderID = glCreateShader(GL_VERTEX_SHADER);
+	GLuint FragmentShaderID = glCreateShader(GL_FRAGMENT_SHADER);
+
+	// Read the Vertex Shader code from the file
+	std::string VertexShaderCode;
+	std::ifstream VertexShaderStream(vertex_file_path, std::ios::in);
+	if(VertexShaderStream.is_open()){
+		std::stringstream sstr;
+		sstr << VertexShaderStream.rdbuf();
+		VertexShaderCode = sstr.str();
+		VertexShaderStream.close();
+	}else{
+		printf("Impossible to open %s. Are you in the right directory ? Don't forget to read the FAQ !\n", vertex_file_path);
+		getchar();
+		return 0;
+	}
+
+	// Read the Fragment Shader code from the file
+	std::string FragmentShaderCode;
+	std::ifstream FragmentShaderStream(fragment_file_path, std::ios::in);
+	if(FragmentShaderStream.is_open()){
+		std::stringstream sstr;
+		sstr << FragmentShaderStream.rdbuf();
+		FragmentShaderCode = sstr.str();
+		FragmentShaderStream.close();
+	}
+
+	GLint Result = GL_FALSE;
+	int InfoLogLength;
+
+
+	// Compile Vertex Shader
+	printf("Compiling shader : %s\n", vertex_file_path);
+	char const * VertexSourcePointer = VertexShaderCode.c_str();
+	glShaderSource(VertexShaderID, 1, &VertexSourcePointer , NULL);
+	glCompileShader(VertexShaderID);
+
+	// Check Vertex Shader
+	glGetShaderiv(VertexShaderID, GL_COMPILE_STATUS, &Result);
+	glGetShaderiv(VertexShaderID, GL_INFO_LOG_LENGTH, &InfoLogLength);
+	if ( InfoLogLength > 0 ){
+		std::vector<char> VertexShaderErrorMessage(InfoLogLength+1);
+		glGetShaderInfoLog(VertexShaderID, InfoLogLength, NULL, &VertexShaderErrorMessage[0]);
+		printf("%s\n", &VertexShaderErrorMessage[0]);
+	}
+
+
+
+	// Compile Fragment Shader
+	printf("Compiling shader : %s\n", fragment_file_path);
+	char const * FragmentSourcePointer = FragmentShaderCode.c_str();
+	glShaderSource(FragmentShaderID, 1, &FragmentSourcePointer , NULL);
+	glCompileShader(FragmentShaderID);
+
+	// Check Fragment Shader
+	glGetShaderiv(FragmentShaderID, GL_COMPILE_STATUS, &Result);
+	glGetShaderiv(FragmentShaderID, GL_INFO_LOG_LENGTH, &InfoLogLength);
+	if ( InfoLogLength > 0 ){
+		std::vector<char> FragmentShaderErrorMessage(InfoLogLength+1);
+		glGetShaderInfoLog(FragmentShaderID, InfoLogLength, NULL, &FragmentShaderErrorMessage[0]);
+		printf("%s\n", &FragmentShaderErrorMessage[0]);
+	}
+
+
+
+	// Link the program
+	printf("Linking program\n");
+	GLuint ProgramID = glCreateProgram();
+	glAttachShader(ProgramID, VertexShaderID);
+	glAttachShader(ProgramID, FragmentShaderID);
+	glLinkProgram(ProgramID);
+
+	// Check the program
+	glGetProgramiv(ProgramID, GL_LINK_STATUS, &Result);
+	glGetProgramiv(ProgramID, GL_INFO_LOG_LENGTH, &InfoLogLength);
+	if ( InfoLogLength > 0 ){
+		std::vector<char> ProgramErrorMessage(InfoLogLength+1);
+		glGetProgramInfoLog(ProgramID, InfoLogLength, NULL, &ProgramErrorMessage[0]);
+		printf("%s\n", &ProgramErrorMessage[0]);
+	}
+
+
+	glDetachShader(ProgramID, VertexShaderID);
+	glDetachShader(ProgramID, FragmentShaderID);
+
+	glDeleteShader(VertexShaderID);
+	glDeleteShader(FragmentShaderID);
+
+	return ProgramID;
+}
+
+//from opengl-tutorial.org
 
 void OpenGLWindow::paintGL()
 {
 
-  // set the viewport
   glViewport(m_xOffset,m_yOffset,m_width,m_height);
-  //glShadeModel(GL_FLAT);
-  //glMatrixMode(GL_PROJECTION);
-  //glLoadIdentity();
-  glOrtho(-1,1,1,-1,-100,100);
-  //glFrustum(10,10,1,10,0.01,1000);
-  // clear the colour and depth buffers ready to draw.
+  // Clear the screen
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-  // enable  vertex array drawing
-  glEnableClientState(GL_VERTEX_ARRAY);
-  glEnableClientState(GL_COLOR_ARRAY);
-  //glEnableClientState(GL_NORMAL_ARRAY);
-  glEnable(GL_BLEND);
-  glDisable(GL_POINT_SMOOTH);
-  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-  glPointSize(pointSize);
-  glEnableClientState(GL_POLYGON_STIPPLE); //<- consider using if glBlend doesn't work right
-  // bind our VBO data to be the currently active one
 
-  //glUseProgram(shaderProgramID);
+  // Use our shader
+  glUseProgram(programID);
 
-  glVertexPointer(3,GL_FLOAT,0,(void*)0);
-  //glNormalPointer(GL_FLOAT,0,(void*)(m_normalOffset*sizeof(GLfloat)));
-  //glColorPointer(4,GL_FLOAT,0,(void*)((m_colorOffset+(m_fluidVboSize-m_colorOffset)/totalFrames*(int(((isPlaying?timer.elapsed():lastPaused)-timerOffset)/1000.0/frameDuration)%totalFrames))*sizeof(GLfloat)));
-  //iter++;
+  // 1rst attribute buffer : vertices
+  glEnableVertexAttribArray(0);
+  glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
+  glVertexAttribPointer(
+     0,                  // attribute 0. No particular reason for 0, but must match the layout in the shader.
+     3,                  // size
+     GL_FLOAT,           // type
+     GL_FALSE,           // normalized?
+     0,                  // stride
+     (void*)0            // array buffer offset
+  );
 
-  int xd = int(((isPlaying?timer.elapsed():lastPaused)-timerOffset)/1000.0/frameDuration)%totalFrames;
-  std::cout<<xd<<"\n";
+  // Draw the triangle !
+  glDrawArrays(GL_TRIANGLES, 0, solidFacesData.size()/3); // Starting from vertex 0; 3 vertices total -> 1 triangle
+  glDisableVertexAttribArray(0);
 
-  //glPolygonStipple();
+  //std::cout<<glGetError()<<"\n";
 
-  glPushMatrix();
-  //glTranslatef(0,0,-10);
-  //glRotatef(360.0* (!m_spin?(timer.elapsed()/5000.0):1),0.0,1.0,0.0);  //* timer.elapsed()/5000
-  //glRotatef(45.0,-0.4,1.0,0.0);
-  glDrawArrays(GL_POINTS, 0, m_colorOffset/3);
-  glDisableClientState(GL_COLOR_ARRAY);
-  glDrawArrays(GL_TRIANGLES,m_colorOffset/3,m_solidVboSize);
-  glPopMatrix();
-  // now turn off the VBO client state as we have finished with it
-  //glDisableClientState(GL_NORMAL_ARRAY);
-  //glDisableClientState(GL_NORMAL_ARRAY);
-  glDisableClientState(GL_VERTEX_ARRAY);
-  //glDisableClientState(GL_COLOR_ARRAY);
-  //glDisableClientState(GL_COLOR_ARRAY);
 }
 
 void OpenGLWindow::timerEvent(QTimerEvent *)

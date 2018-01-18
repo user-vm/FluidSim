@@ -55,3 +55,7 @@ CONFIG += console
 CONFIG -= app_bundle
 linux:LIBS+=-lGLEW
 
+DISTFILES += \
+    shaders/SimpleFragmentShader.glsl \
+    shaders/SimpleVertexShader.glsl
+
