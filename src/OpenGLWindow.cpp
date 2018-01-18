@@ -200,7 +200,7 @@ void OpenGLWindow::makePoints(GLfloat _size)
 
     qint64 kVertex=-1, kColor = m_colorOffset-1, kPres = -1;
 
-    std::unique_ptr<GLfloat []>vertexData( new GLfloat[m_fluidVboSize]);
+    std::unique_ptr<GLfloat []>vertexData( new GLfloat[m_vboSize]);
 
     for(size_t d1=0;d1<xSimSize;d1++){
       for(size_t d2=0;d2<ySimSize;d2++){
@@ -231,9 +231,8 @@ void OpenGLWindow::makePoints(GLfloat _size)
 
     qint64 kSolid=m_fluidVboSize-1;
 
-    /*
     for(size_t d1=0;d1<m_solidVboSize;d1++)
-      vertexData[++kSolid] = solidFacesData[d1];*/
+      vertexData[++kSolid] = solidFacesData[d1];
 
     // now we will create our VBO first we need to ask GL for an Object ID
 
@@ -249,7 +248,7 @@ void OpenGLWindow::makePoints(GLfloat _size)
     // then the pointer to the actual data
     // Then how we are going to draw it (in this case Statically as the data will not change)
     //glBufferData(GL_ARRAY_BUFFER, kColor*sizeof(GL_FLOAT) , vertexData.get(), GL_DYNAMIC_DRAW);
-    glBufferData(GL_ARRAY_BUFFER, m_fluidVboSize*sizeof(GL_FLOAT) , vertexData.get(), GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, m_vboSize*sizeof(GL_FLOAT) , vertexData.get(), GL_DYNAMIC_DRAW);
 }
 
 void OpenGLWindow::paintGL()
@@ -257,6 +256,11 @@ void OpenGLWindow::paintGL()
 
   // set the viewport
   glViewport(m_xOffset,m_yOffset,m_width,m_height);
+  //glShadeModel(GL_FLAT);
+  //glMatrixMode(GL_PROJECTION);
+  //glLoadIdentity();
+  glOrtho(-1,1,1,-1,-100,100);
+  //glFrustum(10,10,1,10,0.01,1000);
   // clear the colour and depth buffers ready to draw.
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   // enable  vertex array drawing
@@ -267,14 +271,14 @@ void OpenGLWindow::paintGL()
   glDisable(GL_POINT_SMOOTH);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   glPointSize(pointSize);
-  //glEnableClientState(GL_POLYGON_STIPPLE); //<- consider using if glBlend doesn't work right
+  glEnableClientState(GL_POLYGON_STIPPLE); //<- consider using if glBlend doesn't work right
   // bind our VBO data to be the currently active one
 
   //glUseProgram(shaderProgramID);
 
   glVertexPointer(3,GL_FLOAT,0,(void*)0);
   //glNormalPointer(GL_FLOAT,0,(void*)(m_normalOffset*sizeof(GLfloat)));
-  glColorPointer(4,GL_FLOAT,0,(void*)((m_colorOffset+(m_fluidVboSize-m_colorOffset)/totalFrames*(int(((isPlaying?timer.elapsed():lastPaused)-timerOffset)/1000.0/frameDuration)%totalFrames))*sizeof(GLfloat)));
+  //glColorPointer(4,GL_FLOAT,0,(void*)((m_colorOffset+(m_fluidVboSize-m_colorOffset)/totalFrames*(int(((isPlaying?timer.elapsed():lastPaused)-timerOffset)/1000.0/frameDuration)%totalFrames))*sizeof(GLfloat)));
   //iter++;
 
   int xd = int(((isPlaying?timer.elapsed():lastPaused)-timerOffset)/1000.0/frameDuration)%totalFrames;
@@ -283,16 +287,18 @@ void OpenGLWindow::paintGL()
   //glPolygonStipple();
 
   glPushMatrix();
-  //glRotatef(360.0* (m_spin?(timer.elapsed()/5000.0):1),0.0,1.0,0.0);  //* timer.elapsed()/5000
-  glRotatef(45.0,-0.4,1.0,0.0);
+  //glTranslatef(0,0,-10);
+  //glRotatef(360.0* (!m_spin?(timer.elapsed()/5000.0):1),0.0,1.0,0.0);  //* timer.elapsed()/5000
+  //glRotatef(45.0,-0.4,1.0,0.0);
   glDrawArrays(GL_POINTS, 0, m_colorOffset/3);
-  //glDrawArrays(GL_TRIANGLES,m_fluidVboSize,m_solidVboSize/9);
+  glDisableClientState(GL_COLOR_ARRAY);
+  glDrawArrays(GL_TRIANGLES,m_colorOffset/3,m_solidVboSize);
   glPopMatrix();
   // now turn off the VBO client state as we have finished with it
   //glDisableClientState(GL_NORMAL_ARRAY);
   //glDisableClientState(GL_NORMAL_ARRAY);
   glDisableClientState(GL_VERTEX_ARRAY);
-  glDisableClientState(GL_COLOR_ARRAY);
+  //glDisableClientState(GL_COLOR_ARRAY);
   //glDisableClientState(GL_COLOR_ARRAY);
 }
 
@@ -805,7 +811,7 @@ std::unique_ptr<GLfloat[]> OpenGLWindow::FrameData::dataToGLfloat(GLfloatTransfo
               floatData[k++] = 1;
               floatData[k++] = 1;
               floatData[k++] = 0;
-              floatData[k++] = (maxVal==0)?0:(data[k2]/maxVal);}
+              floatData[k++] = 1;}//(maxVal==0)?0:(data[k2]/maxVal);}
 
   if(method == CENTER_POINTS)
     for(size_t i_fr = 0;i_fr<num_Frames;i_fr++)
@@ -816,7 +822,7 @@ std::unique_ptr<GLfloat[]> OpenGLWindow::FrameData::dataToGLfloat(GLfloatTransfo
             floatData[k++] = 1;
             floatData[k++] = 1;
             floatData[k++] = 0;
-            floatData[k++] = (maxVal==0)?0:(data[k2]/maxVal);}
+            floatData[k++] = 1;}//(maxVal==0)?0:(data[k2]/maxVal);}
 
   return floatData;
 
