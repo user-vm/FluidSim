@@ -10,6 +10,8 @@
 #include <utility>
 #include <iostream>
 #include <ngl/Vec3.h>
+#include <ngl/Vec4.h>
+#include <GL/glew.h>
 
 #define TAU_TUNING_CONSTANT 0.97
 
@@ -25,6 +27,33 @@ public:
   float get(size_t x, size_t y, size_t z);
 };
 */
+
+enum NormalDirection {X_POS=1, Y_POS=2, Z_POS=3, X_NEG=-1, Y_NEG=-2, Z_NEG=-3};
+
+class VoxelFace{
+
+public:
+  VoxelFace(size_t top, size_t left, size_t bottom, size_t right, size_t depth, NormalDirection nDir);
+  VoxelFace();
+
+  size_t top, left, bottom, right, depth;
+  NormalDirection normal;
+};
+
+template <class T> class Matrix2D{
+
+public:
+  Matrix2D(size_t xSize, size_t ySize);
+  Matrix2D();
+  T get(size_t x, size_t y);
+  bool set(size_t x, size_t y, T value);
+  void setSize(size_t x, size_t y);
+
+private:
+  std::vector<T> data;
+  size_t _xSize, _ySize;
+};
+
 // a representation of a 6D seven point Lagrangian matrix, containing only four values due to symmetry
 class SevenPointLagrangianMatrix{
 public:
@@ -176,7 +205,7 @@ class GridsHolder{
 public:
   GridsHolder(std::vector<std::unique_ptr<GridTuple>> listOfGrids, float gridCellSize, float timeStep,
               float projectionTolerance, size_t maxIterations,
-              float density, ngl::Vec3 g, float at, float bt);
+              float density, ngl::Vec3 g, float at, float bt, ngl::Vec3 solidGridSize);
   //~GridsHolder();
 
   bool append(std::vector<GridTuple> listOfGrids);
@@ -248,6 +277,17 @@ public:
   bool projectDummy();
   bool projectDummy(float dt);
 
+  bool setSolid(size_t x, size_t y, size_t z, bool isSolid);
+  bool isSolid(size_t x,size_t y,size_t z);
+
+  std::vector<GLfloat> solidToFaces(float xMin, float yMin, float zMin, float xMax, float yMax, float zMax);
+
+  std::vector<GLfloat> solidToFaces(ngl::Vec3 minCoords, ngl::Vec3 maxCoords);
+
+  ngl::Vec3 getSolidDims();
+
+  //std::unique_ptr<GLfloat[]> solidToFaces();
+
 private:
   // union doesn't work for these classes, at least not like this
   /*
@@ -264,6 +304,8 @@ private:
   std::vector<Matrix3D*> _grids_M3D;
   std::vector<TwoStepMatrix3D*> _grids_2SM3D;
   std::vector<SevenPointLagrangianMatrix*> _grids_7PL;
+  std::vector<bool> solidGrid;
+  ngl::Vec3 solidGridSize;
 
   std::vector<GridType> _gridTypes;
   std::vector<float> _outsideValues;

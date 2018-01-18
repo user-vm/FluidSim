@@ -66,7 +66,7 @@ class OpenGLWindow : public QOpenGLWindow
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief function to bake fluid simulation
     //----------------------------------------------------------------------------------------------------------------------
-    void bake();
+    void bake(float _size);
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief function to put the initial values into the pressure grid
     //----------------------------------------------------------------------------------------------------------------------
@@ -83,6 +83,10 @@ class OpenGLWindow : public QOpenGLWindow
     /// @brief function to load the initial values into the velocity grids (u,v,w)
     //----------------------------------------------------------------------------------------------------------------------
     void initializeVelocity(GridsHolder* gridsHolder);
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief function to load the solid cell positions into the GridsHolder object
+    //----------------------------------------------------------------------------------------------------------------------
+    void initializeSolid(GridsHolder* gridsHolder);
 
     // REWRITE THIS
 
@@ -95,6 +99,10 @@ class OpenGLWindow : public QOpenGLWindow
     GLint m_cubeSubVBOSize=0;
     /// @brief size of the subVBO corresponding to a single point (when doing the GL_POINTS render)
     GLint m_pointSubVBOSize=0;
+    /// @brief size of the VBO portion corresponding to the tris of the solid cells
+    GLint m_solidVboSize;
+    /// @brief size of the VBO portion corresponding to the fluid points (when doing the GL_POINTS render)
+    GLint m_fluidVboSize;
     /// @brief size of the simulation in grid cells in x, y and z, respectively
     GLint xSimSize=20, ySimSize=20, zSimSize=20;
     /// @brief ID of shader program
@@ -189,7 +197,7 @@ class OpenGLWindow : public QOpenGLWindow
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief type of fluid (water or smoke)
     //----------------------------------------------------------------------------------------------------------------------
-    FluidType fluidType = WATER;
+    FluidType fluidType = SMOKE;
 
     size_t m_normalOffset;
 
@@ -207,6 +215,8 @@ class OpenGLWindow : public QOpenGLWindow
     std::unique_ptr<GLfloat[]> vColorData;
     std::unique_ptr<GLfloat[]> wColorData;
     std::unique_ptr<GLfloat[]> mainColorData;
+
+    std::vector<GLfloat> solidFacesData;
 
     // something that can be fed into the shader
     class FrameData{

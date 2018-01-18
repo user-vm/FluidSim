@@ -1,5 +1,54 @@
 #include "Bake.h"
 
+// Matrix2D functions
+template <class T>
+Matrix2D<T>::Matrix2D(){
+
+  _xSize = 0;
+  _ySize = 0;
+
+  data = std::vector<T>();
+  data.resize(0);
+}
+
+template <class T>
+Matrix2D<T>::Matrix2D(size_t xSize, size_t ySize){
+
+  _xSize = xSize;
+  _ySize = ySize;
+
+  data = std::vector<T>();
+
+  data.resize(_xSize*_ySize);
+}
+
+template <class T>
+bool Matrix2D<T>::set(size_t x, size_t y, T value){
+
+  if(data.size()>x*_ySize+y){
+    data[x*_ySize+y] = value;
+    return true;}
+
+  return false;
+}
+
+template <class T>
+void Matrix2D<T>::setSize(size_t x, size_t y){
+
+  data.resize(x*y);
+  _xSize = x;
+  _ySize = y;
+}
+
+template <class T>
+T Matrix2D<T>::get(size_t x, size_t y){
+
+  if(data.size()>x*_ySize+y)
+    return data[x*_ySize+y];
+
+  return NULL;
+}
+
 // Matrix3D functions
 
 Matrix3D::Matrix3D(size_t xSize, size_t ySize, size_t zSize) : _xSize(xSize), _ySize(ySize), _zSize(zSize){
@@ -273,7 +322,7 @@ GridTuple::GridTuple(std::string gridName, GridType gridType, size_t x, size_t y
 // GridsHolder functions
 
 GridsHolder::GridsHolder(std::vector<std::unique_ptr<GridTuple> > listOfGrids, float gridCellSize, float timeStep,
-                         float projectionTolerance, size_t maxIterations, float density, ngl::Vec3 g, float at, float bt){
+                         float projectionTolerance, size_t maxIterations, float density, ngl::Vec3 g, float at, float bt, ngl::Vec3 solidGridSize){
 
   // custom lambda compare function; list gets sorted alphabetically
   std::sort(listOfGrids.begin(),listOfGrids.end(), [](const std::unique_ptr<GridTuple> &a, const std::unique_ptr<GridTuple> &b){
@@ -301,6 +350,9 @@ GridsHolder::GridsHolder(std::vector<std::unique_ptr<GridTuple> > listOfGrids, f
 
     }
 
+  solidGrid = std::vector<bool>();
+  solidGrid.resize(solidGridSize.m_x*solidGridSize.m_y*solidGridSize.m_z);
+  this->solidGridSize=solidGridSize;
   dx = gridCellSize;
   default_dt = timeStep;
   _density = density;
@@ -316,6 +368,29 @@ GridsHolder::GridsHolder(std::vector<std::unique_ptr<GridTuple> > listOfGrids, f
 
 size_t GridsHolder::size(){
   return _gridNames.size();
+}
+
+bool GridsHolder::isSolid(size_t x, size_t y, size_t z){
+
+  if(solidGrid.size() > (x*solidGridSize.m_y+y)*solidGridSize.m_z+z)
+    return solidGrid[(x*solidGridSize.m_y+y)*solidGridSize.m_z+z];
+
+  return false;
+}
+
+bool GridsHolder::setSolid(size_t x, size_t y, size_t z, bool isSolid){
+
+  if(solidGrid.size() > (x*solidGridSize.m_y+y)*solidGridSize.m_z+z){
+    solidGrid[(x*solidGridSize.m_y+y)*solidGridSize.m_z+z] = isSolid;
+    return true;
+    }
+
+  return false;
+}
+
+ngl::Vec3 GridsHolder::getSolidDims(){
+
+  return solidGridSize;
 }
 
 //QtCreator is too shit to debug boost variants even with helpers
@@ -1118,4 +1193,184 @@ bool GridsHolder::append(std::unique_ptr<GridTuple> gridTuple){
   _outsideValues.push_back(gridTuple.get()->_outsideValue);
 
   return true;
+}
+
+VoxelFace::VoxelFace(){
+
+  top=0;
+  bottom=0;
+  left=0;
+  right=0;
+  depth=0;
+
+  normal = X_POS;
+}
+
+VoxelFace::VoxelFace(size_t top, size_t left, size_t bottom, size_t right, size_t depth, NormalDirection nDir){
+
+  this->top=top;
+  this->bottom=bottom;
+  this->right=right;
+  this->depth=depth;
+  this->left=left;
+  normal=nDir;
+}
+
+//scans the solid voxels of the simulation and creates a reasonably low amount of faces to display them
+std::vector<GLfloat> GridsHolder::solidToFaces(float xMin, float yMin, float zMin, float xMax, float yMax, float zMax){
+
+  return solidToFaces(ngl::Vec3(xMin,yMin,zMin),ngl::Vec3(xMax,yMax,zMax));
+}
+
+std::vector<GLfloat> GridsHolder::solidToFaces(ngl::Vec3 minCoords, ngl::Vec3 maxCoords){
+
+  std::vector<VoxelFace> rectList;
+
+  Matrix2D<bool> isFace = Matrix2D<bool>();
+  isFace.setSize(solidGridSize.m_y,solidGridSize.m_z);
+
+  VoxelFace rectCoords;
+
+  size_t maxWidth, maxArea;
+
+  for(int i=0;i<=solidGridSize.m_x;i++)
+
+    //we will separate by normal direction (it points from solid to space)
+    for(int rev=0;rev<2;rev++){
+        for(int j=0;j<solidGridSize.m_y;j++)
+          for(int k=0;k<solidGridSize.m_z;k++)
+            if(isSolid(i-!rev,j,k) && !isSolid(i-rev,j,k))
+              isFace.set(j,k,true);
+            else
+              isFace.set(j,k,false);
+
+        //can try only going from min and max coords for which isFace is true
+        for(int j=0;j<solidGridSize.m_y;j++)
+          for(int k=0;k<solidGridSize.m_z;k++)
+
+            if(isFace.get(j,k)){
+                maxWidth = SIZE_MAX;
+                maxArea = 1;
+                rectCoords = VoxelFace(j,k,j,k,i,rev?X_NEG:X_POS);
+
+                int j1,k1;
+
+                for(j1=j;j1<solidGridSize.m_y && isFace.get(j1,k);j1++){
+                    for(k1=k;k1<solidGridSize.m_z && k1-k<maxWidth&&isFace.get(j,k1);k1++);
+                    maxWidth = k1-k;
+                    if(maxWidth*(j-j1)>maxArea){
+                        maxArea = maxWidth*(j-j1);
+                        rectCoords.top = j;
+                        rectCoords.left = j1-1;
+                        rectCoords.bottom = k;
+                        rectCoords.right = k1-1;
+                      }
+                  }
+                for(j1=rectCoords.top;j1<=rectCoords.bottom;j1++)
+                  for(k1=rectCoords.left;k1<=rectCoords.right;k1++)
+                    isFace.set(j1,k1,false);
+                rectList.push_back(rectCoords);
+              }
+      }
+/*
+  for(i=0;i<=solidGridSize.m_y;i++)
+
+    //we will separate by normal direction (it points from solid to space)
+    for(rev=0;rev<2;rev++)
+      for(j=0;j<solidGridSize.m_z;j++)
+        for(k=0;k<solidGridSize.m_x;k++){
+          if(isSolid(i,y-!rev,k) && !isSolid(i,j-rev,k))
+            isFace.set(j,k,true);
+          else
+            isFace.set(j,k,false);
+
+          for(j=0;j<solidGridSize.m_y;j++)
+            for(k=0;k<solidGridSize.m_z;k++)
+
+              if(isFace.get(j,k)){
+                  y=j;
+                  z=k;
+                  maxWidth = INFINITY;
+                  maxArea = 1;
+                  rectCoords = VoxelFace(j,k,j,k,i,rev?Y_NEG:Y_POS);
+                  for(y=j;y<solidGridSize.m_y&&isFace.get(y,k);y++){
+                    for(z=k;z<solidGridSize.m_z&&z-k<maxWidth&&isFace.get(j,z);z++);
+                    maxWidth = z-k;
+                    if(maxWidth*(j-y)>maxArea){
+                        maxArea = maxWidth*(j-y);
+                        rectCoords.m_x = j;
+                        rectCoords.m_y = y-1;
+                        rectCoords.m_z = k;
+                        rectCoords.m_w = z-1;
+                      }
+                    }
+                  rectList.push_back(rectCoords);
+                }
+        }
+*/
+    std::vector<GLfloat> faces = std::vector<GLfloat>(18*rectList.size());
+
+    float xDepth, xLeft, xBottom, xRight, xTop; //the position of the face in OpenGL space
+
+    float xMin = minCoords.m_x;
+    float yMin = minCoords.m_y;
+    float zMin = minCoords.m_z;
+
+    float xMax = maxCoords.m_x;
+    float yMax = maxCoords.m_y;
+    float zMax = maxCoords.m_z;
+
+    size_t fi = 0;
+
+    for(int i=0;i<rectList.size();i++){
+
+        if(rectList[i].normal==X_POS || rectList[i].normal==X_NEG){
+          xDepth = (xMin*(solidGridSize.m_x - rectList[i].depth) + xMax*(rectList[i].depth)) / solidGridSize.m_x;
+
+          xLeft = (yMin * (solidGridSize.m_y - rectList[i].left) + yMax * rectList[i].left) / solidGridSize.m_y;
+          xRight = (yMin * (solidGridSize.m_y - rectList[i].right - 1) + yMax * (rectList[i].right + 1)) / solidGridSize.m_y;
+
+          xTop = (zMin * (solidGridSize.m_z - rectList[i].top) + zMax * rectList[i].top) / solidGridSize.m_z;
+          xBottom = (zMin * (solidGridSize.m_z - rectList[i].bottom - 1) + zMax * (rectList[i].bottom + 1)) / solidGridSize.m_z;
+
+          //1--->---2
+          //|\AAAAAA|
+          //|B\AAAAA|
+          //|BB\AAAA|
+          //^BBB+AAAv
+          //|BBBB\AA|
+          //|BBBBB\A|
+          //|BBBBBB\|
+          //4---<---3
+
+          //face A (1->2->3)
+          faces[fi++] = xDepth;
+          faces[fi++] = xLeft;
+          faces[fi++] = xTop;
+
+          faces[fi++] = xDepth;
+          faces[fi++] = xRight;
+          faces[fi++] = xTop;
+
+          faces[fi++] = xDepth;
+          faces[fi++] = xRight;
+          faces[fi++] = xBottom;
+
+          //face B (1->3->4)
+          faces[fi++] = xDepth;
+          faces[fi++] = xLeft;
+          faces[fi++] = xTop;
+
+          faces[fi++] = xDepth;
+          faces[fi++] = xRight;
+          faces[fi++] = xBottom;
+
+          faces[fi++] = xDepth;
+          faces[fi++] = xLeft;
+          faces[fi++] = xBottom;
+          }
+      }
+
+    return faces;
+
 }

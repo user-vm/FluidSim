@@ -45,7 +45,7 @@ void OpenGLWindow::initializeGL()
 
   pointSize = GLfloat(m_viewport[3])/2.0*cubeSize*10;
 
-  bake();
+  bake(cubeSize);
   makePoints(cubeSize);
 }
 
@@ -190,17 +190,17 @@ void OpenGLWindow::makePoints(GLfloat _size)
     // and we need to add 1 to each of them for the <= loop
     // and finally muliply by 12 as we have 12 values per line pair
     m_pointSubVBOSize=3+totalFrames*4;//the 7 is from 4 color values// 6 + totalFrames coordinates per vertex for now, 3 vertices/tri, 2 tris/quad, 6 quads/cube //3 coordinates per vertex, 3 vertices per tri, 2 tris per quad, 6 quads per cube, 3 data types (vertex, normal, colour)
-    m_vboSize= m_pointSubVBOSize*xSimSize*ySimSize*zSimSize;
+    m_fluidVboSize= m_pointSubVBOSize*xSimSize*ySimSize*zSimSize;
+    m_solidVboSize = solidFacesData.size();
+
+    m_vboSize = m_fluidVboSize + m_solidVboSize;
 
     // all vertex position data, all normal data, all color data
     m_colorOffset = 3*xSimSize*ySimSize*zSimSize;
 
     qint64 kVertex=-1, kColor = m_colorOffset-1, kPres = -1;
 
-    std::unique_ptr<GLfloat []>vertexData( new GLfloat[m_vboSize]);
-
-    //we will interleave the vertex, normal and colour data
-
+    std::unique_ptr<GLfloat []>vertexData( new GLfloat[m_fluidVboSize]);
 
     for(size_t d1=0;d1<xSimSize;d1++){
       for(size_t d2=0;d2<ySimSize;d2++){
@@ -227,11 +227,18 @@ void OpenGLWindow::makePoints(GLfloat _size)
     //std::cout<<"\n+++NEW FRAME+++\n\n";
     }
 
+    std::cout<<"kColor = "<<kColor<<"; kVertex = "<<kVertex<<"\n";
 
+    qint64 kSolid=m_fluidVboSize-1;
+
+    /*
+    for(size_t d1=0;d1<m_solidVboSize;d1++)
+      vertexData[++kSolid] = solidFacesData[d1];*/
 
     // now we will create our VBO first we need to ask GL for an Object ID
 
-
+    for(size_t d1=0;d1<kVertex;d1++)
+      std::cout<<vertexData[d1]<<" ";
 
     glGenBuffers(1, &m_vboPointer);
     // now we bind this ID to an Array buffer
@@ -242,7 +249,7 @@ void OpenGLWindow::makePoints(GLfloat _size)
     // then the pointer to the actual data
     // Then how we are going to draw it (in this case Statically as the data will not change)
     //glBufferData(GL_ARRAY_BUFFER, kColor*sizeof(GL_FLOAT) , vertexData.get(), GL_DYNAMIC_DRAW);
-    glBufferData(GL_ARRAY_BUFFER, m_vboSize*sizeof(GL_FLOAT) , vertexData.get(), GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, m_fluidVboSize*sizeof(GL_FLOAT) , vertexData.get(), GL_DYNAMIC_DRAW);
 }
 
 void OpenGLWindow::paintGL()
@@ -267,7 +274,7 @@ void OpenGLWindow::paintGL()
 
   glVertexPointer(3,GL_FLOAT,0,(void*)0);
   //glNormalPointer(GL_FLOAT,0,(void*)(m_normalOffset*sizeof(GLfloat)));
-  glColorPointer(4,GL_FLOAT,0,(void*)((m_colorOffset+(m_vboSize-m_colorOffset)/totalFrames*(int(((isPlaying?timer.elapsed():lastPaused)-timerOffset)/1000.0/frameDuration)%totalFrames))*sizeof(GLfloat)));
+  glColorPointer(4,GL_FLOAT,0,(void*)((m_colorOffset+(m_fluidVboSize-m_colorOffset)/totalFrames*(int(((isPlaying?timer.elapsed():lastPaused)-timerOffset)/1000.0/frameDuration)%totalFrames))*sizeof(GLfloat)));
   //iter++;
 
   int xd = int(((isPlaying?timer.elapsed():lastPaused)-timerOffset)/1000.0/frameDuration)%totalFrames;
@@ -279,11 +286,14 @@ void OpenGLWindow::paintGL()
   //glRotatef(360.0* (m_spin?(timer.elapsed()/5000.0):1),0.0,1.0,0.0);  //* timer.elapsed()/5000
   glRotatef(45.0,-0.4,1.0,0.0);
   glDrawArrays(GL_POINTS, 0, m_colorOffset/3);
+  //glDrawArrays(GL_TRIANGLES,m_fluidVboSize,m_solidVboSize/9);
   glPopMatrix();
   // now turn off the VBO client state as we have finished with it
   //glDisableClientState(GL_NORMAL_ARRAY);
+  //glDisableClientState(GL_NORMAL_ARRAY);
   glDisableClientState(GL_VERTEX_ARRAY);
   glDisableClientState(GL_COLOR_ARRAY);
+  //glDisableClientState(GL_COLOR_ARRAY);
 }
 
 void OpenGLWindow::timerEvent(QTimerEvent *)
@@ -450,6 +460,15 @@ void OpenGLWindow::initializeVelocity(GridsHolder *gridsHolder){
 
 }
 
+void OpenGLWindow::initializeSolid(GridsHolder *gridsHolder){
+
+  ngl::Vec3 solidSize = gridsHolder->getSolidDims();
+
+  for(size_t i=0;i<solidSize.m_x;i++)
+    for(size_t j=0;j<solidSize.m_z;j++)
+      gridsHolder->setSolid(i,0,j,true);
+}
+
 /*  x_Size = v->xSize();
   y_Size = v->ySize();
   z_Size = v->zSize();
@@ -472,7 +491,7 @@ void OpenGLWindow::initializeVelocity(GridsHolder *gridsHolder){
 
 }*/
 
-void OpenGLWindow::bake(){
+void OpenGLWindow::bake(float _size){
 
   float dx = cubeSize;
 
@@ -525,7 +544,9 @@ void OpenGLWindow::bake(){
   gridsToMake.push_back(std::unique_ptr<GridTuple>(new GridTuple("q",GRID_3D,xSimSize,ySimSize,zSimSize)));
   gridsToMake.push_back(std::unique_ptr<GridTuple>(new GridTuple("A",GRID_3D_7PL,xSimSize,ySimSize,zSimSize)));
 
-  std::unique_ptr<GridsHolder> grids = std::unique_ptr<GridsHolder>(new GridsHolder(std::move(gridsToMake), dx, dt, tol, maxIterations, rho, gDep, at, bt));
+  ngl::Vec3 solidGridSize = ngl::Vec3(xSimSize,ySimSize,zSimSize);
+
+  std::unique_ptr<GridsHolder> grids = std::unique_ptr<GridsHolder>(new GridsHolder(std::move(gridsToMake), dx, dt, tol, maxIterations, rho, gDep, at, bt, solidGridSize));
 
   //addPressureFrameData();
   //addVelocityFrameData();
@@ -535,6 +556,7 @@ void OpenGLWindow::bake(){
   initializeVelocity(grids.get());
   initializeTemperature(grids.get());
   initializeSmokeConcentration(grids.get());
+  initializeSolid(grids.get());
 
   //pressureFrameData = std::unique_ptr<FrameData>(new FrameData(xSimSize,ySimSize,zSimSize));
   //tempFrameData = std::unique_ptr<FrameData>(new FrameData(xSimSize,ySimSize,zSimSize));
@@ -595,7 +617,7 @@ void OpenGLWindow::bake(){
           sc = grids.get()->getTwoStepMatrix3DByName("sc");
           T->swap();
           sc->swap();
-          grids.get()->project(tempDt);
+          //grids.get()->project(tempDt);
           simTime += tempDt;
           if(makeFrame){
               mainFrameData->addFrame(grids.get(),"sc");
@@ -613,6 +635,8 @@ void OpenGLWindow::bake(){
 
       tempDt = dt;
     }
+
+  solidFacesData = grids->solidToFaces(-xSimSize/2.0*_size,-ySimSize/2.0*_size,-zSimSize/2.0*_size,xSimSize/2.0*_size,ySimSize/2.0*_size,zSimSize/2.0*_size);
 
   grids.reset();
 
@@ -659,7 +683,7 @@ bool OpenGLWindow::FrameData::addFrame(GridsHolder* gridsHolder, std::string gri
       std::cout<<"Index of frame to add is not in scope of FrameData object \""<<_name<<"\"";
     return false;}
 
-  // grid data saves onyl two timesteps; that's why you need to copy them
+  // grid data saves only two timesteps; that's why you need to copy them
   // consider file caching in the future? (whatever that means)
 
   bool doSizesMatch = true;
@@ -781,7 +805,7 @@ std::unique_ptr<GLfloat[]> OpenGLWindow::FrameData::dataToGLfloat(GLfloatTransfo
               floatData[k++] = 1;
               floatData[k++] = 1;
               floatData[k++] = 0;
-              floatData[k++] = data[k2]/maxVal;}
+              floatData[k++] = (maxVal==0)?0:(data[k2]/maxVal);}
 
   if(method == CENTER_POINTS)
     for(size_t i_fr = 0;i_fr<num_Frames;i_fr++)
@@ -792,7 +816,7 @@ std::unique_ptr<GLfloat[]> OpenGLWindow::FrameData::dataToGLfloat(GLfloatTransfo
             floatData[k++] = 1;
             floatData[k++] = 1;
             floatData[k++] = 0;
-            floatData[k++] = data[k2]/maxVal;}
+            floatData[k++] = (maxVal==0)?0:(data[k2]/maxVal);}
 
   return floatData;
 
