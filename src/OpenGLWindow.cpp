@@ -43,7 +43,9 @@ void OpenGLWindow::initializeGL()
 
   glGetIntegerv(GL_VIEWPORT,m_viewport);
 
-  projectionMatrix = glm::perspective(glm::radians(initialFoV), 4.0f / 3.0f, 0.1f, 100.0f);
+  std::cout<<m_width<<" "<<m_height<<"\n";
+  viewMatrix = glm::mat4(1.0);
+  modelMatrix = glm::mat4(1.0);
 
   std::cout<<m_viewport[0]<<" "<<m_viewport[1]<<" "<<m_viewport[2]<<" "<<m_viewport[3]<<"\n";
 
@@ -257,7 +259,7 @@ void OpenGLWindow::makePoints(GLfloat _size)
     // Get a handle for our "MVP" uniform
     matrixID = glGetUniformLocation(programID, "MVP");
 
-    std::cout<<glGetError()<<"\n";
+    //std::cout<<glGetError()<<"\n";
 
     static const GLfloat g_vertex_buffer_data[] = {
             -1.0f, -1.0f, 0.0f,
@@ -388,10 +390,40 @@ void OpenGLWindow::paintGL()
   // Use our shader
   glUseProgram(programID);
 
-  glm::mat4 ViewMatrix = getViewMatrix();
-  glm::mat4 ModelMatrix = glm::mat4(1.0);
-  glm::mat4 MVP = ProjectionMatrix * ViewMatrix * ModelMatrix;
-  MVP = glm::rotate(MVP, glm::radians(timer.elapsed()/1000.0f*10.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+  projectionMatrix = glm::perspective(glm::radians(initialFoV), m_width*1.0f / m_height, 0.1f, 100.0f);
+/*
+  std::cout<<"\nprojectionMatrix=\n";
+  for(int i=0;i<4;i++){
+    std::cout<<"[";
+    for(int j=0;j<4;j++)
+      std::cout<<projectionMatrix[i][j]<<" ";
+    std::cout<<"]\n";}
+
+  std::cout<<"\nviewMatrix=\n";
+  for(int i=0;i<4;i++){
+    std::cout<<"[";
+    for(int j=0;j<4;j++)
+      std::cout<<viewMatrix[i][j]<<" ";
+    std::cout<<"]\n";}
+
+  std::cout<<"\nmodelMatrix=\n";
+  for(int i=0;i<4;i++){
+    std::cout<<"[";
+    for(int j=0;j<4;j++)
+      std::cout<<modelMatrix[i][j]<<" ";
+    std::cout<<"]\n";}*/
+
+  glm::mat4 MVP = glm::mat4(1.0);
+  MVP = projectionMatrix * viewMatrix * modelMatrix;
+/*
+  std::cout<<"\nMVP=\n";
+  for(int i=0;i<4;i++){
+    std::cout<<"[";
+    for(int j=0;j<4;j++)
+      std::cout<<MVP[i][j]<<" ";
+    std::cout<<"]\n";}*/
+
+  //MVP = glm::rotate(MVP, glm::radians(timer.elapsed()/1000.0f*10.0f), glm::vec3(1.0f, 0.0f, 0.0f));
 
   glUniformMatrix4fv(matrixID, 1, GL_FALSE, &MVP[0][0]);
 
@@ -421,7 +453,7 @@ void OpenGLWindow::paintGL()
 
   a_value++;
 
-  std::cout<<glGetError()<<"\n";
+  //std::cout<<glGetError()<<"\n";
 
 }
 
@@ -437,50 +469,152 @@ void OpenGLWindow::timerEvent(QTimerEvent *)
   update();*/
 }
 
+void OpenGLWindow::mousePressEvent(QMouseEvent *_event){
+
+  std::cout<<"mousePressEvent at "<<timer.elapsed()<<"\n";
+
+  switch(_event->button()){
+    case Qt::LeftButton:{
+        mousePosOnLeftClick = ngl::Vec2(_event->x(),_event->y());
+        posOnLeftClick = position;
+        horizontalAngleOnLeftClick = horizontalAngle;
+        verticalAngleOnLeftClick = verticalAngle;
+        std::cout<<"LB pressed at "<<timer.elapsed()<<"\n";
+        break;
+      }
+    case Qt::RightButton:{
+        mousePosOnRightClick = ngl::Vec2(_event->x(),_event->y());
+        posOnRightClick = position;
+        horizontalAngleOnRightClick = horizontalAngle;
+        verticalAngleOnRightClick = verticalAngle;
+        break;
+      }
+    case Qt::MiddleButton:{
+        mousePosOnMiddleClick = ngl::Vec2(_event->x(),_event->y());
+        posOnMiddleClick = position;
+        horizontalAngleOnMiddleClick = horizontalAngle;
+        verticalAngleOnMiddleClick = verticalAngle;
+        break;
+      }
+    default: {}
+    }
+}
+
+void OpenGLWindow::wheelEvent(QWheelEvent *_event){
+
+  QPoint numDegrees = _event->angleDelta();
+
+  if(!numDegrees.isNull()){
+      QPoint numSteps = numDegrees/15;
+
+      // Direction : Spherical coordinates to Cartesian coordinates conversion
+      glm::vec3 direction(
+            cos(verticalAngle) * sin(horizontalAngle),
+            sin(verticalAngle),
+            cos(verticalAngle) * cos(horizontalAngle)
+            );
+
+      // Right vector
+      glm::vec3 right = glm::vec3(
+            sin(horizontalAngle - 3.14f/2.0f),
+            0,
+            cos(horizontalAngle - 3.14f/2.0f)
+            );
+
+      // Up vector
+      glm::vec3 up = glm::cross( right, direction );
+
+      position += direction * float(numSteps.y()*scrollSpeed);
+      //std::cout<<numSteps.x()<<" "<<numSteps.y()<<"\n";
+
+      viewMatrix = glm::lookAt(position,           // Camera is here
+                               position+direction, // and looks here : at the same position, plus "direction"
+                               up);                // Head is up (set to 0,-1,0 to look upside-down)
+
+    }
+}
+
 //based on controls.cpp from
 void OpenGLWindow::mouseMoveEvent(QMouseEvent *_event)
 {
-  // timer is called only once, the first time this function is called
-  static double lastTime = timer.elapsed()/1000.0;
+  switch(_event->buttons()){
+    case Qt::LeftButton :{
+        // timer is called only once, the first time this function is called
+        //static double lastTime = timer.elapsed()/1000.0;
 
-  // Compute time difference between current and last frame
-  double currentTime = timer.elapsed()/1000.0;
-  float deltaTime = float(currentTime - lastTime);
+        // Compute time difference between current and last frame
+        //double currentTime = timer.elapsed()/1000.0;
+        //float deltaTime = float(currentTime - lastTime);
 
-  double xpos, ypos;
-  xPos = _event->x();
-  yPos = _event->y();
-  // Get mouse position
+        // Get mouse position
+        double xPos, yPos;
+        xPos = _event->x();
+        yPos = _event->y();
 
-  glfwGetCursorPos(window, &xpos, &ypos);
+        //glfwGetCursorPos(window, &xpos, &ypos);
 
-  // Reset mouse position for next frame
-  glfwSetCursorPos(window, 1024/2, 768/2);
+        // Reset mouse position for next frame
+        //glfwSetCursorPos(window, 1024/2, 768/2);
 
-  // Compute new orientation
-  horizontalAngle += mouseSpeed * float(1024/2 - xpos );
-  verticalAngle   += mouseSpeed * float( 768/2 - ypos );
+        // Compute new orientation
+        horizontalAngle = horizontalAngleOnLeftClick + mouseSpeed * float(mousePosOnLeftClick.m_x-xPos);
+        verticalAngle   = verticalAngleOnLeftClick + mouseSpeed * float(mousePosOnLeftClick.m_y-yPos);
 
-  // Direction : Spherical coordinates to Cartesian coordinates conversion
-  glm::vec3 direction(
-          cos(verticalAngle) * sin(horizontalAngle),
-          sin(verticalAngle),
-          cos(verticalAngle) * cos(horizontalAngle)
-  );
+        // Direction : Spherical coordinates to Cartesian coordinates conversion
+        glm::vec3 direction(
+              cos(verticalAngle) * sin(horizontalAngle),
+              sin(verticalAngle),
+              cos(verticalAngle) * cos(horizontalAngle)
+              );
 
-  // Right vector
-  glm::vec3 right = glm::vec3(
-          sin(horizontalAngle - 3.14f/2.0f),
-          0,
-          cos(horizontalAngle - 3.14f/2.0f)
-  );
+        // Right vector
+        glm::vec3 right = glm::vec3(
+              sin(horizontalAngle - 3.14f/2.0f),
+              0,
+              cos(horizontalAngle - 3.14f/2.0f)
+              );
 
-  // Up vector
-  glm::vec3 up = glm::cross( right, direction );
+        // Up vector
+        glm::vec3 up = glm::cross( right, direction );
 
-  ViewMatrix = glm::lookAt(position,           // Camera is here
-                           position+direction, // and looks here : at the same position, plus "direction"
-                           up);                // Head is up (set to 0,-1,0 to look upside-down)
+        viewMatrix = glm::lookAt(position,           // Camera is here
+                                 position+direction, // and looks here : at the same position, plus "direction"
+                                 up);                // Head is up (set to 0,-1,0 to look upside-down)
+        break;
+
+      }
+    case Qt::MiddleButton :{
+
+        double xPos, yPos;
+        xPos = _event->x();
+        yPos = _event->y();
+
+        glm::vec3 direction(
+              cos(verticalAngle) * sin(horizontalAngle),
+              sin(verticalAngle),
+              cos(verticalAngle) * cos(horizontalAngle)
+              );
+
+        glm::vec3 right = glm::vec3(
+              sin(horizontalAngle - 3.14f/2.0f),
+              0,
+              cos(horizontalAngle - 3.14f/2.0f)
+              );
+
+        glm::vec3 up = glm::cross( right, direction );
+
+
+        position = posOnMiddleClick - mouseSpeed*(right*float(xPos-mousePosOnMiddleClick.m_x) - up*float(yPos-mousePosOnMiddleClick.m_y));
+
+        viewMatrix = glm::lookAt(position,           // Camera is here
+                                 position+direction, // and looks here : at the same position, plus "direction"
+                                 up);                // Head is up (set to 0,-1,0 to look upside-down)
+        break;
+      }
+    default:{}
+    }
+
+
 }
 
 void OpenGLWindow::keyPressEvent(QKeyEvent *_event)
@@ -516,6 +650,26 @@ void OpenGLWindow::keyPressEvent(QKeyEvent *_event)
         timerOffset -= frameDuration*1000;
         break;
       }
+    case '.':{
+        position = glm::vec3(0.0,0.0,0.0);
+        glm::vec3 direction(
+              cos(verticalAngle) * sin(horizontalAngle),
+              sin(verticalAngle),
+              cos(verticalAngle) * cos(horizontalAngle)
+              );
+        glm::vec3 right = glm::vec3(
+              sin(horizontalAngle - 3.14f/2.0f),
+              0,
+              cos(horizontalAngle - 3.14f/2.0f)
+              );
+
+        glm::vec3 up = glm::cross( right, direction );
+        viewMatrix = glm::lookAt(position,           // Camera is here
+                                 position+direction, // and looks here : at the same position, plus "direction"
+                                 up);                // Head is up (set to 0,-1,0 to look upside-down)
+        break;
+      }
+    default:{}
     }
 }
 

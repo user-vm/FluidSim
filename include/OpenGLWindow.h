@@ -51,9 +51,17 @@ class OpenGLWindow : public QOpenGLWindow
     //----------------------------------------------------------------------------------------------------------------------
     void keyPressEvent(QKeyEvent *);
     //----------------------------------------------------------------------------------------------------------------------
-    /// @brief process key events
+    /// @brief process mouse move events (when a button is pressed)
     //----------------------------------------------------------------------------------------------------------------------
-    void mouseMoveEvent(QKeyEvent *);
+    void mouseMoveEvent(QMouseEvent *);
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief process mouse button events
+    //----------------------------------------------------------------------------------------------------------------------
+    void mousePressEvent(QMouseEvent *);
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief process scroll events
+    //----------------------------------------------------------------------------------------------------------------------
+    void wheelEvent(QWheelEvent *);
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief resize event
     //----------------------------------------------------------------------------------------------------------------------
@@ -232,9 +240,9 @@ class OpenGLWindow : public QOpenGLWindow
     std::vector<GLfloat> solidFacesData;
 
     // Initial position : on +Z
-    glm::vec3 position = glm::vec3( 0, 0, 5 );
+    glm::vec3 position = glm::vec3( 0, 0, 0 );
     // Initial horizontal angle : toward -Z
-    float horizontalAngle = 3.14f;
+    float horizontalAngle = 0.0f;//3.14f;
     // Initial vertical angle : none
     float verticalAngle = 0.0f;
     // Initial Field of View
@@ -242,8 +250,28 @@ class OpenGLWindow : public QOpenGLWindow
 
     float speed = 3.0f; // 3 units / second
     float mouseSpeed = 0.005f;
+    float scrollSpeed = 0.005f;
 
     glm::mat4 projectionMatrix;
+
+    ngl::Vec2 mousePosOnLeftClick;
+    ngl::Vec2 mousePosOnRightClick;
+    ngl::Vec2 mousePosOnMiddleClick;
+
+    glm::vec3 posOnLeftClick;
+    glm::vec3 posOnRightClick;
+    glm::vec3 posOnMiddleClick;
+
+    glm::mat4 modelMatrix;
+    glm::mat4 viewMatrix;
+
+    float horizontalAngleOnLeftClick;
+    float horizontalAngleOnMiddleClick;
+    float horizontalAngleOnRightClick;
+
+    float verticalAngleOnLeftClick;
+    float verticalAngleOnMiddleClick;
+    float verticalAngleOnRightClick;
 
     // something that can be fed into the shader
     class FrameData{
