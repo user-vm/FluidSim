@@ -12,10 +12,13 @@
 #include <ngl/Vec3.h>
 #include <ngl/Vec4.h>
 #include <GL/glew.h>
+#include <cctype>
 
 #define TAU_TUNING_CONSTANT 0.97
 
 enum GridType {GRID_3D = 1, GRID_3D_TWOSTEP = 2, GRID_3D_7PL = 3, GRID_INVALID = 0};
+
+enum Axis {X_AXIS=0, Y_AXIS=1, Z_AXIS=2};
 /*
 class DisplayableMatrix{
 
@@ -279,6 +282,7 @@ public:
 
   bool setSolid(size_t x, size_t y, size_t z, bool isSolid);
   bool isSolid(size_t x,size_t y,size_t z);
+  bool isSolid(size_t x, size_t y, size_t z, std::string axesOrder);
 
   std::vector<GLfloat> solidToFaces(float xMin, float yMin, float zMin, float xMax, float yMax, float zMax);
 

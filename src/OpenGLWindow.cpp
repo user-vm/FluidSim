@@ -43,6 +43,8 @@ void OpenGLWindow::initializeGL()
 
   glGetIntegerv(GL_VIEWPORT,m_viewport);
 
+  projectionMatrix = glm::perspective(glm::radians(initialFoV), 4.0f / 3.0f, 0.1f, 100.0f);
+
   std::cout<<m_viewport[0]<<" "<<m_viewport[1]<<" "<<m_viewport[2]<<" "<<m_viewport[3]<<"\n";
 
   pointSize = GLfloat(m_viewport[3])/2.0*cubeSize*10;
@@ -234,8 +236,9 @@ void OpenGLWindow::makePoints(GLfloat _size)
     qint64 kSolid=m_fluidVboSize-1;
     /*
     for(size_t d1=0;d1<m_solidVboSize;d1++)
-      vertexData[++kSolid] = solidFacesData[d1];*/
-
+      //vertexData[++kSolid] = solidFacesData[d1];
+      std::cout<<
+    */
     // now we will create our VBO first we need to ask GL for an Object ID
 
     /*for(size_t d1=0;d1<kVertex;d1++)
@@ -251,12 +254,29 @@ void OpenGLWindow::makePoints(GLfloat _size)
     glGenVertexArrays(1, &VertexArrayID);
     glBindVertexArray(VertexArrayID);
 
+    // Get a handle for our "MVP" uniform
+    matrixID = glGetUniformLocation(programID, "MVP");
+
+    std::cout<<glGetError()<<"\n";
+
+    static const GLfloat g_vertex_buffer_data[] = {
+            -1.0f, -1.0f, 0.0f,
+             1.0f, -1.0f, 0.0f,
+             0.0f,  1.0f, 0.0f,
+    };
+    /*
+    for(size_t d1=0;d1<solidFacesData.size();d1++)
+      solidFacesData[d1]+= 0.25 * (std::rand()*2.0/RAND_MAX-0.5); //adds a random float value between -0.25 and 0.25
+    */
     // Generate 1 buffer, put the resulting identifier in vertexbuffer
     glGenBuffers(1, &vertexbuffer);
     // The following commands will talk about our 'vertexbuffer' buffer
     glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
     // Give our vertices to OpenGL.
-    glBufferData(GL_ARRAY_BUFFER, solidFacesData.size()*sizeof(GLfloat), solidFacesData.data(), GL_STATIC_DRAW);
+    if(useTriangle)
+      glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_DYNAMIC_DRAW);
+    else
+      glBufferData(GL_ARRAY_BUFFER, solidFacesData.size()*sizeof(GLfloat), solidFacesData.data(), GL_DYNAMIC_DRAW);
 }
 
 // from opengl-tutorial.org
@@ -356,6 +376,8 @@ GLuint OpenGLWindow::LoadShaders(const char * vertex_file_path,const char * frag
 
 //from opengl-tutorial.org
 
+int a_value=0;
+
 void OpenGLWindow::paintGL()
 {
 
@@ -365,6 +387,17 @@ void OpenGLWindow::paintGL()
 
   // Use our shader
   glUseProgram(programID);
+
+  glm::mat4 ViewMatrix = getViewMatrix();
+  glm::mat4 ModelMatrix = glm::mat4(1.0);
+  glm::mat4 MVP = ProjectionMatrix * ViewMatrix * ModelMatrix;
+  MVP = glm::rotate(MVP, glm::radians(timer.elapsed()/1000.0f*10.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+
+  glUniformMatrix4fv(matrixID, 1, GL_FALSE, &MVP[0][0]);
+
+  //GLfloat transMatVals[16];
+  //glGetUniformfv(programID,matrixID,transMatVals);
+  //trans = glm::rotate(trans, glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 
   // 1rst attribute buffer : vertices
   glEnableVertexAttribArray(0);
@@ -379,10 +412,16 @@ void OpenGLWindow::paintGL()
   );
 
   // Draw the triangle !
-  glDrawArrays(GL_TRIANGLES, 0, solidFacesData.size()/3); // Starting from vertex 0; 3 vertices total -> 1 triangle
+  //glRotatef(36,0,0,1); //doesn't work, probably need shader-side rotation
+  if(useTriangle)
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+  else
+    glDrawArrays(GL_TRIANGLES, 0, solidFacesData.size()/3); // Starting from vertex 0; 3 vertices total -> 1 triangle
   glDisableVertexAttribArray(0);
 
-  //std::cout<<glGetError()<<"\n";
+  a_value++;
+
+  std::cout<<glGetError()<<"\n";
 
 }
 
@@ -396,6 +435,52 @@ void OpenGLWindow::timerEvent(QTimerEvent *)
   glBufferSubData(GL_ARRAY_BUFFER,(GLintptr)(m_colorOffset*sizeof(GLfloat)), //+pressureFrameData->frameSize()*frameOffset*sizeof(float)),
                   pressureFrameData->frameSize()*4*3*2*6*sizeof(GLfloat)*10,&((mainColorData.get())[frameOffset*4*3*2*6]));
   update();*/
+}
+
+//based on controls.cpp from
+void OpenGLWindow::mouseMoveEvent(QMouseEvent *_event)
+{
+  // timer is called only once, the first time this function is called
+  static double lastTime = timer.elapsed()/1000.0;
+
+  // Compute time difference between current and last frame
+  double currentTime = timer.elapsed()/1000.0;
+  float deltaTime = float(currentTime - lastTime);
+
+  double xpos, ypos;
+  xPos = _event->x();
+  yPos = _event->y();
+  // Get mouse position
+
+  glfwGetCursorPos(window, &xpos, &ypos);
+
+  // Reset mouse position for next frame
+  glfwSetCursorPos(window, 1024/2, 768/2);
+
+  // Compute new orientation
+  horizontalAngle += mouseSpeed * float(1024/2 - xpos );
+  verticalAngle   += mouseSpeed * float( 768/2 - ypos );
+
+  // Direction : Spherical coordinates to Cartesian coordinates conversion
+  glm::vec3 direction(
+          cos(verticalAngle) * sin(horizontalAngle),
+          sin(verticalAngle),
+          cos(verticalAngle) * cos(horizontalAngle)
+  );
+
+  // Right vector
+  glm::vec3 right = glm::vec3(
+          sin(horizontalAngle - 3.14f/2.0f),
+          0,
+          cos(horizontalAngle - 3.14f/2.0f)
+  );
+
+  // Up vector
+  glm::vec3 up = glm::cross( right, direction );
+
+  ViewMatrix = glm::lookAt(position,           // Camera is here
+                           position+direction, // and looks here : at the same position, plus "direction"
+                           up);                // Head is up (set to 0,-1,0 to look upside-down)
 }
 
 void OpenGLWindow::keyPressEvent(QKeyEvent *_event)
@@ -598,6 +683,7 @@ void OpenGLWindow::bake(float _size){
         gDep = 0.0;
         break;
       }
+    case MIX:{}
     }
 
   //^^check if it works (break statement position)^^

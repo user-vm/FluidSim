@@ -4,6 +4,9 @@
 #include <QOpenGLWindow>
 #include <QElapsedTimer>
 #include <ngl/Vec3.h>
+#include <cstdlib>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include "Bake.h"
 
 enum FluidType {SMOKE=0, WATER=1, MIX=2};
@@ -36,6 +39,8 @@ class OpenGLWindow : public QOpenGLWindow
     GLuint LoadShaders(const char * vertex_file_path,const char * fragment_file_path);
 
     GLuint programID;
+
+    GLuint matrixID;
   private:
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief event called by the timer to allow use to re-draw / animate
@@ -45,6 +50,10 @@ class OpenGLWindow : public QOpenGLWindow
     /// @brief process key events
     //----------------------------------------------------------------------------------------------------------------------
     void keyPressEvent(QKeyEvent *);
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief process key events
+    //----------------------------------------------------------------------------------------------------------------------
+    void mouseMoveEvent(QKeyEvent *);
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief resize event
     //----------------------------------------------------------------------------------------------------------------------
@@ -163,7 +172,7 @@ class OpenGLWindow : public QOpenGLWindow
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief the total time to simulate
     //----------------------------------------------------------------------------------------------------------------------
-    float totalSimTime=2.0;
+    float totalSimTime=1.0;
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief the default gravitational acceleration
     //----------------------------------------------------------------------------------------------------------------------
@@ -221,6 +230,20 @@ class OpenGLWindow : public QOpenGLWindow
     std::unique_ptr<GLfloat[]> mainColorData;
 
     std::vector<GLfloat> solidFacesData;
+
+    // Initial position : on +Z
+    glm::vec3 position = glm::vec3( 0, 0, 5 );
+    // Initial horizontal angle : toward -Z
+    float horizontalAngle = 3.14f;
+    // Initial vertical angle : none
+    float verticalAngle = 0.0f;
+    // Initial Field of View
+    float initialFoV = 45.0f;
+
+    float speed = 3.0f; // 3 units / second
+    float mouseSpeed = 0.005f;
+
+    glm::mat4 projectionMatrix;
 
     // something that can be fed into the shader
     class FrameData{
@@ -295,6 +318,9 @@ class OpenGLWindow : public QOpenGLWindow
 
     // This will identify our vertex buffer
     GLuint vertexbuffer;
+
+    //temporary stuff you should delete later
+    bool useTriangle = false;
 };
 
 #endif
