@@ -239,8 +239,10 @@ class OpenGLWindow : public QOpenGLWindow
 
     std::vector<GLfloat> solidFacesData;
 
-    // Initial position : on +Z
-    glm::vec3 position = glm::vec3( 0, 0, 0 );
+    // Initial position : on -Z
+    glm::vec3 position = glm::vec3( 0, 0, -5 );
+    // Initial focus point
+    glm::vec3 focusPoint = glm::vec3(0,0,0);
     // Initial horizontal angle : toward -Z
     float horizontalAngle = 0.0f;//3.14f;
     // Initial vertical angle : none
@@ -261,6 +263,8 @@ class OpenGLWindow : public QOpenGLWindow
     glm::vec3 posOnLeftClick;
     glm::vec3 posOnRightClick;
     glm::vec3 posOnMiddleClick;
+
+    glm::vec3 fpOnMiddleClick;
 
     glm::mat4 modelMatrix;
     glm::mat4 viewMatrix;

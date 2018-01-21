@@ -53,6 +53,8 @@ void OpenGLWindow::initializeGL()
 
   bake(cubeSize);
   makePoints(cubeSize);
+
+  std::cout<<"m_width = "<<m_width<<"; m_height = "<<m_height<<"\n";
 }
 
 void  OpenGLWindow::makeCubes( GLfloat _size)
@@ -390,7 +392,7 @@ void OpenGLWindow::paintGL()
   // Use our shader
   glUseProgram(programID);
 
-  projectionMatrix = glm::perspective(glm::radians(initialFoV), m_width*1.0f / m_height, 0.1f, 100.0f);
+  projectionMatrix = glm::perspective(glm::radians(initialFoV), m_width*1.0f / m_height, 0.01f, 100.0f);
 /*
   std::cout<<"\nprojectionMatrix=\n";
   for(int i=0;i<4;i++){
@@ -492,6 +494,7 @@ void OpenGLWindow::mousePressEvent(QMouseEvent *_event){
     case Qt::MiddleButton:{
         mousePosOnMiddleClick = ngl::Vec2(_event->x(),_event->y());
         posOnMiddleClick = position;
+        fpOnMiddleClick = focusPoint;
         horizontalAngleOnMiddleClick = horizontalAngle;
         verticalAngleOnMiddleClick = verticalAngle;
         break;
@@ -528,7 +531,7 @@ void OpenGLWindow::wheelEvent(QWheelEvent *_event){
       //std::cout<<numSteps.x()<<" "<<numSteps.y()<<"\n";
 
       viewMatrix = glm::lookAt(position,           // Camera is here
-                               position+direction, // and looks here : at the same position, plus "direction"
+                               focusPoint,         // and looks here : at the same position, plus "direction"
                                up);                // Head is up (set to 0,-1,0 to look upside-down)
 
     }
@@ -538,6 +541,8 @@ void OpenGLWindow::wheelEvent(QWheelEvent *_event){
 void OpenGLWindow::mouseMoveEvent(QMouseEvent *_event)
 {
   switch(_event->buttons()){
+
+    //left mouse button rotates camera around focus point
     case Qt::LeftButton :{
         // timer is called only once, the first time this function is called
         //static double lastTime = timer.elapsed()/1000.0;
@@ -576,9 +581,10 @@ void OpenGLWindow::mouseMoveEvent(QMouseEvent *_event)
 
         // Up vector
         glm::vec3 up = glm::cross( right, direction );
+        position = -glm::distance(position,focusPoint)*direction + focusPoint;
 
         viewMatrix = glm::lookAt(position,           // Camera is here
-                                 position+direction, // and looks here : at the same position, plus "direction"
+                                 focusPoint,         // and looks here : at the same position, plus "direction"
                                  up);                // Head is up (set to 0,-1,0 to look upside-down)
         break;
 
@@ -605,15 +611,47 @@ void OpenGLWindow::mouseMoveEvent(QMouseEvent *_event)
 
 
         position = posOnMiddleClick - mouseSpeed*(right*float(xPos-mousePosOnMiddleClick.m_x) - up*float(yPos-mousePosOnMiddleClick.m_y));
+        focusPoint = fpOnMiddleClick + position - posOnMiddleClick; //fpOnMiddleClick - mouseSpeed*(right*float(xPos-mousePosOnMiddleClick.m_x) - up*float(yPos-mousePosOnMiddleClick.m_y));
+
+        std::cout<<"position "<<position[0]<<" "<<position[1]<<" "<<position[2]<<" "<<", focusPoint "<<focusPoint[0]<<" "<<focusPoint[1]<<" "<<focusPoint[2]<<"\n";
 
         viewMatrix = glm::lookAt(position,           // Camera is here
-                                 position+direction, // and looks here : at the same position, plus "direction"
+                                 focusPoint,         // and looks here : at the same position, plus "direction"
                                  up);                // Head is up (set to 0,-1,0 to look upside-down)
         break;
       }
+    case Qt::RightButton:{
+
+        double yPos;
+        yPos = _event->y();
+
+        // Direction : Spherical coordinates to Cartesian coordinates conversion
+        glm::vec3 direction(
+              cos(verticalAngle) * sin(horizontalAngle),
+              sin(verticalAngle),
+              cos(verticalAngle) * cos(horizontalAngle)
+              );
+
+        // Right vector
+        glm::vec3 right = glm::vec3(
+              sin(horizontalAngle - 3.14f/2.0f),
+              0,
+              cos(horizontalAngle - 3.14f/2.0f)
+              );
+
+        // Up vector
+        glm::vec3 up = glm::cross( right, direction );
+
+        position = posOnRightClick - mouseSpeed * direction * float(yPos-mousePosOnRightClick.m_y);
+        //std::cout<<numSteps.x()<<" "<<numSteps.y()<<"\n";
+
+        viewMatrix = glm::lookAt(position,           // Camera is here
+                                 focusPoint,         // and looks here : at the same position, plus "direction"
+                                 up);                // Head is up (set to 0,-1,0 to look upside-down)
+
+      }
     default:{}
     }
-
 
 }
 
@@ -676,8 +714,8 @@ void OpenGLWindow::keyPressEvent(QKeyEvent *_event)
 void OpenGLWindow::resizeGL(int _w, int _h)
 {
 
-  m_width  = static_cast<int>( ((_w<_h)?_w:_h) * devicePixelRatio() );
-  m_height = static_cast<int>( ((_w<_h)?_w:_h) * devicePixelRatio() );
+  m_width  = static_cast<int>(_w * devicePixelRatio() );//((_w<_h)?_w:_h) * devicePixelRatio() );
+  m_height = static_cast<int>(_h * devicePixelRatio() );//((_w<_h)?_w:_h) * devicePixelRatio() );
   m_xOffset = (_w - m_width)/2;
   m_yOffset = (_h - m_height) / 2;
 }
