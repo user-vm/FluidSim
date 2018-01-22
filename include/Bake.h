@@ -336,4 +336,4 @@ private:
   float _at,_bt;
 };
 
-#endif
+#endif // BAKE_H

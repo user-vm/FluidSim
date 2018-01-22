@@ -1347,8 +1347,8 @@ std::vector<GLfloat> GridsHolder::solidToFaces(ngl::Vec3 minCoords, ngl::Vec3 ma
       xLeft = (minCoords[(axis+1)%3] * (solidGridSize[(axis+1)%3] - rectList[i].left) + maxCoords[(axis+1)%3] * rectList[i].left) / solidGridSize[(axis+1)%3];
       xRight = (minCoords[(axis+1)%3] * (solidGridSize[(axis+1)%3] - rectList[i].right - 1) + maxCoords[(axis+1)%3] * (rectList[i].right + 1)) / solidGridSize[(axis+1)%3];
 
-      xTop = (minCoords[(axis+2)%3] * (solidGridSize[(axis+2)%3] - rectList[i].top) + maxCoords[(axis+2)%3] * rectList[i].top) / solidGridSize[(axis+2)%3];
-      xBottom = (minCoords[(axis+2)%3] * (solidGridSize[(axis+2)%3] - rectList[i].bottom - 1) + maxCoords[(axis+2)%3] * (rectList[i].bottom + 1)) / solidGridSize[(axis+2)%3];
+      xTop = (minCoords[(axis+2)%3] * (solidGridSize[(axis+2)%3] - rectList[i].top - 1) + maxCoords[(axis+2)%3] * (rectList[i].top + 1)) / solidGridSize[(axis+2)%3];
+      xBottom = (minCoords[(axis+2)%3] * (solidGridSize[(axis+2)%3] - rectList[i].bottom) + maxCoords[(axis+2)%3] * rectList[i].bottom) / solidGridSize[(axis+2)%3];
 
       //for X_POS or X_NEG
       //xLeft->zMin

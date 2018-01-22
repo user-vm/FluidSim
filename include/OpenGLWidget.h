@@ -1,7 +1,7 @@
-#ifndef OPENGLWINDOW_H_
-#define OPENGLWINDOW_H_
+#ifndef OPENGLWIDGET_H_
+#define OPENGLWIDGET_H_
 #include <GL/glew.h>
-#include <QOpenGLWindow>
+#include <QOpenGLWidget>
 #include <QElapsedTimer>
 #include <ngl/Vec3.h>
 #include <cstdlib>
@@ -11,21 +11,21 @@
 
 enum FluidType {SMOKE=0, WATER=1, MIX=2};
 
-class OpenGLWindow : public QOpenGLWindow
+class OpenGLWidget: public QOpenGLWidget
 {
     // need to tell Qt to run the MOC
     Q_OBJECT
   public:
     //----------------------------------------------------------------------------------------------------------------------
-    /// @brief ctor for OpenGL window must set the surface type to OpenGL
-    /// @param [in] parent the parent window to the class
+    /// @brief ctor for OpenGL widget must set the surface type to OpenGL
+    /// @param [in] parent the parent widget to the class
     //----------------------------------------------------------------------------------------------------------------------
-    explicit OpenGLWindow();
+    explicit OpenGLWidget(QWidget *parent = nullptr);
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief dtor, remember to remove the device once finished
     //----------------------------------------------------------------------------------------------------------------------
 
-    ~OpenGLWindow();
+    ~OpenGLWidget();
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief render method called every update
     //----------------------------------------------------------------------------------------------------------------------
@@ -35,6 +35,10 @@ class OpenGLWindow : public QOpenGLWindow
     /// this is only called one time, just after we have a valid GL context use this to init any global GL elements
     //----------------------------------------------------------------------------------------------------------------------
     void initializeGL();
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief resize event
+    //----------------------------------------------------------------------------------------------------------------------
+    void resizeGL(int _w, int _h);
 
     GLuint LoadShaders(const char * vertex_file_path,const char * fragment_file_path);
 
@@ -62,10 +66,6 @@ class OpenGLWindow : public QOpenGLWindow
     /// @brief process scroll events
     //----------------------------------------------------------------------------------------------------------------------
     void wheelEvent(QWheelEvent *);
-    //----------------------------------------------------------------------------------------------------------------------
-    /// @brief resize event
-    //----------------------------------------------------------------------------------------------------------------------
-    void resizeGL(int _w, int _h);
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief a simple draw grid function
     /// @param[in] _size the size of the grid (width and height)
@@ -129,19 +129,19 @@ class OpenGLWindow : public QOpenGLWindow
     /// @brief ID of shader program
     GLint shaderProgramID=0;
     //----------------------------------------------------------------------------------------------------------------------
-    /// @brief window width from resize event
+    /// @brief widget width from resize event
     //----------------------------------------------------------------------------------------------------------------------
     int m_width;
     //----------------------------------------------------------------------------------------------------------------------
-    /// @brief window height from resize event
+    /// @brief widget height from resize event
     //----------------------------------------------------------------------------------------------------------------------
     int m_height;
     //----------------------------------------------------------------------------------------------------------------------
-    /// @brief x offset to center OpenGL canvas in window and keep it square
+    /// @brief x offset to center OpenGL canvas in widget and keep it square
     //----------------------------------------------------------------------------------------------------------------------
     int m_xOffset;
     //----------------------------------------------------------------------------------------------------------------------
-    /// @brief y offset to center OpenGL canvas in window and keep it square
+    /// @brief y offset to center OpenGL canvas in widget and keep it square
     //----------------------------------------------------------------------------------------------------------------------
     int m_yOffset;
     //----------------------------------------------------------------------------------------------------------------------
@@ -240,13 +240,17 @@ class OpenGLWindow : public QOpenGLWindow
     std::vector<GLfloat> solidFacesData;
 
     // Initial position : on -Z
-    glm::vec3 position = glm::vec3( 0, 0, -5 );
+    const glm::vec3 initialPosition = glm::vec3( 0, 0, -2 );
+    glm::vec3 position;
     // Initial focus point
-    glm::vec3 focusPoint = glm::vec3(0,0,0);
+    const glm::vec3 initialFocusPoint = glm::vec3(0,0,0);
+    glm::vec3 focusPoint;
     // Initial horizontal angle : toward -Z
-    float horizontalAngle = 0.0f;//3.14f;
+    const float initialHorizontalAngle = 3.14f;
+    float horizontalAngle;
     // Initial vertical angle : none
-    float verticalAngle = 0.0f;
+    const float initialVerticalAngle = 0.0f;
+    float verticalAngle;
     // Initial Field of View
     float initialFoV = 45.0f;
 
@@ -353,6 +357,11 @@ class OpenGLWindow : public QOpenGLWindow
 
     //temporary stuff you should delete later
     bool useTriangle = false;
+
+signals:
+
+public slots:
+    void resetCamera();
 };
 
-#endif
+#endif // OPENGLWIDGET_H

@@ -1,3 +1,9 @@
+#-------------------------------------------------
+#
+# Project created by QtCreator 2018-01-21T23:34:11
+#
+#-------------------------------------------------
+
 TARGET=FluidSim
 OBJECTS_DIR=obj
 # as I want to support 4.8 and 5 this will set a flag for some of the mac stuff
@@ -9,13 +15,23 @@ cache()
 MOC_DIR=moc
 CONFIG-=app_bundle
 CONFIG+=c++11
-QT+= opengl core
-SOURCES+= $$PWD/src/main.cpp \
-          $$PWD/src/OpenGLWindow.cpp \
-          $$PWD/src/Bake.cpp
+QT+= opengl core gui
 
-HEADERS+= $$PWD/include/OpenGLWindow.h \
-          $$PWD/include/Bake.h
+
+SOURCES += \
+        $$PWD/src/main.cpp \
+        $$PWD/src/mainwindow.cpp \
+    $$PWD/src/OpenGLWidget.cpp \
+    $$PWD/src/Bake.cpp
+
+HEADERS += \
+        $$PWD/include/mainwindow.h \
+    $$PWD/include/OpenGLWidget.h \
+    $$PWD/include/Bake.h
+
+FORMS += \
+        $$PWD/ui/mainwindow.ui
+
 INCLUDEPATH+=$$PWD/include/
 DESTDIR=./
 
@@ -57,5 +73,6 @@ linux:LIBS+=-lGLEW
 
 DISTFILES += \
     shaders/SimpleFragmentShader.glsl \
-    shaders/SimpleVertexShader.glsl
-
+    shaders/SimpleVertexShader.glsl \
+    shaders/PhongFragment.glsl \
+    shaders/PhongVertex.glsl

@@ -1,9 +1,11 @@
+#include "OpenGLWidget.h"
+
 /*
- * Basic GL Window modified from the example here
+ * Basic GL Widget modified from the example here
  * http://qt-project.org/doc/qt-5.0/qtgui/openglwindow.html
  * adapted to use NGL
  */
-#include "OpenGLWindow.h"
+#include "OpenGLWidget.h"
 #include <QKeyEvent>
 #include <QApplication>
 #include <memory>
@@ -16,21 +18,43 @@
 
 constexpr float cubeSize=0.05;
 
-OpenGLWindow::OpenGLWindow()
+OpenGLWidget::OpenGLWidget(QWidget *parent) : QOpenGLWidget(parent)
 {
-  setTitle("Qt5 compat profile OpenGL 3.2");
+  //setTitle("Qt5 compat profile OpenGL 3.2");
 
 }
 
-OpenGLWindow::~OpenGLWindow()
+OpenGLWidget::~OpenGLWidget()
 {
   // now we have finished clear the device
   std::cout<<"deleting buffer\n";
   glDeleteBuffers(1,&m_vboPointer);
 }
 
-void OpenGLWindow::initializeGL()
+void OpenGLWidget::initializeGL()
 {
+
+  // Direction : Spherical coordinates to Cartesian coordinates conversion
+  glm::vec3 direction(
+        cos(verticalAngle) * sin(horizontalAngle),
+        sin(verticalAngle),
+        cos(verticalAngle) * cos(horizontalAngle)
+        );
+
+  // Right vector
+  glm::vec3 right = glm::vec3(
+        sin(horizontalAngle - 3.14f/2.0f),
+        0,
+        cos(horizontalAngle - 3.14f/2.0f)
+        );
+
+  // Up vector
+  glm::vec3 up = glm::cross( right, direction );
+
+  position = initialPosition;
+  verticalAngle = initialVerticalAngle;
+  horizontalAngle = initialHorizontalAngle;
+  focusPoint = initialFocusPoint;
 
   glewInit();
 
@@ -44,10 +68,21 @@ void OpenGLWindow::initializeGL()
   glGetIntegerv(GL_VIEWPORT,m_viewport);
 
   std::cout<<m_width<<" "<<m_height<<"\n";
-  viewMatrix = glm::mat4(1.0);
+
+  viewMatrix = glm::lookAt(position,           // Camera is here
+                           focusPoint,         // and looks here : at the same position, plus "direction"
+                           up);                // Head is up (set to 0,-1,0 to look upside-down)
+
   modelMatrix = glm::mat4(1.0);
 
   std::cout<<m_viewport[0]<<" "<<m_viewport[1]<<" "<<m_viewport[2]<<" "<<m_viewport[3]<<"\n";
+
+  std::cout<<"\nviewMatrix=\n";
+  for(int i=0;i<4;i++){
+    std::cout<<"[";
+    for(int j=0;j<4;j++)
+      std::cout<<viewMatrix[i][j]<<" ";
+    std::cout<<"]\n";}
 
   pointSize = GLfloat(m_viewport[3])/2.0*cubeSize*10;
 
@@ -57,7 +92,7 @@ void OpenGLWindow::initializeGL()
   std::cout<<"m_width = "<<m_width<<"; m_height = "<<m_height<<"\n";
 }
 
-void  OpenGLWindow::makeCubes( GLfloat _size)
+void  OpenGLWidget::makeCubes( GLfloat _size)
 {
   // allocate enough space for our verts
   // as we are doing lines it will be 2 verts per line
@@ -191,7 +226,7 @@ void  OpenGLWindow::makeCubes( GLfloat _size)
 
 }
 
-void OpenGLWindow::makePoints(GLfloat _size)
+void OpenGLWidget::makePoints(GLfloat _size)
   {
     // allocate enough space for our verts
     // as we are doing lines it will be 2 verts per line
@@ -284,7 +319,7 @@ void OpenGLWindow::makePoints(GLfloat _size)
 }
 
 // from opengl-tutorial.org
-GLuint OpenGLWindow::LoadShaders(const char * vertex_file_path,const char * fragment_file_path){
+GLuint OpenGLWidget::LoadShaders(const char * vertex_file_path,const char * fragment_file_path){
 
 	// Create the shaders
 	GLuint VertexShaderID = glCreateShader(GL_VERTEX_SHADER);
@@ -382,7 +417,7 @@ GLuint OpenGLWindow::LoadShaders(const char * vertex_file_path,const char * frag
 
 int a_value=0;
 
-void OpenGLWindow::paintGL()
+void OpenGLWidget::paintGL()
 {
 
   glViewport(m_xOffset,m_yOffset,m_width,m_height);
@@ -459,7 +494,7 @@ void OpenGLWindow::paintGL()
 
 }
 
-void OpenGLWindow::timerEvent(QTimerEvent *)
+void OpenGLWidget::timerEvent(QTimerEvent *)
 {
   //std::cout<<timer.elapsed()<<"\n";
   update();
@@ -471,7 +506,7 @@ void OpenGLWindow::timerEvent(QTimerEvent *)
   update();*/
 }
 
-void OpenGLWindow::mousePressEvent(QMouseEvent *_event){
+void OpenGLWidget::mousePressEvent(QMouseEvent *_event){
 
   std::cout<<"mousePressEvent at "<<timer.elapsed()<<"\n";
 
@@ -503,7 +538,7 @@ void OpenGLWindow::mousePressEvent(QMouseEvent *_event){
     }
 }
 
-void OpenGLWindow::wheelEvent(QWheelEvent *_event){
+void OpenGLWidget::wheelEvent(QWheelEvent *_event){
 
   QPoint numDegrees = _event->angleDelta();
 
@@ -534,11 +569,18 @@ void OpenGLWindow::wheelEvent(QWheelEvent *_event){
                                focusPoint,         // and looks here : at the same position, plus "direction"
                                up);                // Head is up (set to 0,-1,0 to look upside-down)
 
+      std::cout<<"\nviewMatrix=\n";
+      for(int i=0;i<4;i++){
+        std::cout<<"[";
+        for(int j=0;j<4;j++)
+          std::cout<<viewMatrix[i][j]<<" ";
+        std::cout<<"]\n";}
+
     }
 }
 
 //based on controls.cpp from
-void OpenGLWindow::mouseMoveEvent(QMouseEvent *_event)
+void OpenGLWidget::mouseMoveEvent(QMouseEvent *_event)
 {
   switch(_event->buttons()){
 
@@ -562,8 +604,8 @@ void OpenGLWindow::mouseMoveEvent(QMouseEvent *_event)
         //glfwSetCursorPos(window, 1024/2, 768/2);
 
         // Compute new orientation
-        horizontalAngle = horizontalAngleOnLeftClick + mouseSpeed * float(mousePosOnLeftClick.m_x-xPos);
-        verticalAngle   = verticalAngleOnLeftClick + mouseSpeed * float(mousePosOnLeftClick.m_y-yPos);
+        horizontalAngle = horizontalAngleOnLeftClick - mouseSpeed * float(mousePosOnLeftClick.m_x-xPos);
+        verticalAngle   = verticalAngleOnLeftClick - mouseSpeed * float(mousePosOnLeftClick.m_y-yPos);
 
         // Direction : Spherical coordinates to Cartesian coordinates conversion
         glm::vec3 direction(
@@ -581,7 +623,7 @@ void OpenGLWindow::mouseMoveEvent(QMouseEvent *_event)
 
         // Up vector
         glm::vec3 up = glm::cross( right, direction );
-        position = -glm::distance(position,focusPoint)*direction + focusPoint;
+        position = glm::distance(position,focusPoint)*direction + focusPoint;
 
         viewMatrix = glm::lookAt(position,           // Camera is here
                                  focusPoint,         // and looks here : at the same position, plus "direction"
@@ -610,7 +652,7 @@ void OpenGLWindow::mouseMoveEvent(QMouseEvent *_event)
         glm::vec3 up = glm::cross( right, direction );
 
 
-        position = posOnMiddleClick - mouseSpeed*(right*float(xPos-mousePosOnMiddleClick.m_x) - up*float(yPos-mousePosOnMiddleClick.m_y));
+        position = posOnMiddleClick + mouseSpeed*(right*float(xPos-mousePosOnMiddleClick.m_x) + up*float(yPos-mousePosOnMiddleClick.m_y));
         focusPoint = fpOnMiddleClick + position - posOnMiddleClick; //fpOnMiddleClick - mouseSpeed*(right*float(xPos-mousePosOnMiddleClick.m_x) - up*float(yPos-mousePosOnMiddleClick.m_y));
 
         std::cout<<"position "<<position[0]<<" "<<position[1]<<" "<<position[2]<<" "<<", focusPoint "<<focusPoint[0]<<" "<<focusPoint[1]<<" "<<focusPoint[2]<<"\n";
@@ -655,7 +697,7 @@ void OpenGLWindow::mouseMoveEvent(QMouseEvent *_event)
 
 }
 
-void OpenGLWindow::keyPressEvent(QKeyEvent *_event)
+void OpenGLWidget::keyPressEvent(QKeyEvent *_event)
 {
   switch (_event->key())
     {
@@ -688,7 +730,7 @@ void OpenGLWindow::keyPressEvent(QKeyEvent *_event)
         timerOffset -= frameDuration*1000;
         break;
       }
-    case '.':{
+    /*case '.':{
         position = glm::vec3(0.0,0.0,0.0);
         glm::vec3 direction(
               cos(verticalAngle) * sin(horizontalAngle),
@@ -706,31 +748,68 @@ void OpenGLWindow::keyPressEvent(QKeyEvent *_event)
                                  position+direction, // and looks here : at the same position, plus "direction"
                                  up);                // Head is up (set to 0,-1,0 to look upside-down)
         break;
-      }
+      }*/
     default:{}
     }
 }
 
-void OpenGLWindow::resizeGL(int _w, int _h)
+void OpenGLWidget::resizeGL(int _w, int _h)
 {
 
   m_width  = static_cast<int>(_w * devicePixelRatio() );//((_w<_h)?_w:_h) * devicePixelRatio() );
   m_height = static_cast<int>(_h * devicePixelRatio() );//((_w<_h)?_w:_h) * devicePixelRatio() );
   m_xOffset = (_w - m_width)/2;
   m_yOffset = (_h - m_height) / 2;
+  //std::cout<<"Resized to"
 }
 /*
-void OpenGLWindow::addPressureFrameData(GridsHolder grids){
+void OpenGLWidget::addPressureFrameData(GridsHolder grids){
 
   pressureFrameData.resize(pressureFrameData.size() + x_Size*y_Size*z_Size);
 
 }
 
-void OpenGLWindow::addVelocityFrameData(){
+void OpenGLWidget::addVelocityFrameData(){
 
 }
 */
-void OpenGLWindow::initializePressure(GridsHolder *gridsHolder){
+void OpenGLWidget::resetCamera(){
+
+  position = initialPosition;
+  verticalAngle = initialVerticalAngle;
+  horizontalAngle = initialHorizontalAngle;
+  focusPoint = initialFocusPoint;
+
+  // Direction : Spherical coordinates to Cartesian coordinates conversion
+  glm::vec3 direction(
+        cos(verticalAngle) * sin(horizontalAngle),
+        sin(verticalAngle),
+        cos(verticalAngle) * cos(horizontalAngle)
+        );
+
+  // Right vector
+  glm::vec3 right = glm::vec3(
+        sin(horizontalAngle - 3.14f/2.0f),
+        0,
+        cos(horizontalAngle - 3.14f/2.0f)
+        );
+
+  // Up vector
+  glm::vec3 up = glm::cross( right, direction );
+
+  viewMatrix = glm::lookAt(position,           // Camera is here
+                           focusPoint,         // and looks here : at the same position, plus "direction"
+                           up);                // Head is up (set to 0,-1,0 to look upside-down)
+
+  std::cout<<"\nviewMatrix=\n";
+  for(int i=0;i<4;i++){
+    std::cout<<"[";
+    for(int j=0;j<4;j++)
+      std::cout<<viewMatrix[i][j]<<" ";
+    std::cout<<"]\n";}
+}
+
+void OpenGLWidget::initializePressure(GridsHolder *gridsHolder){
 
   // here we will populate the pressure grid with its initial values
 
@@ -753,7 +832,7 @@ void OpenGLWindow::initializePressure(GridsHolder *gridsHolder){
         p->setOld(i,j,k,std::fabs(((x_Size*1.0)/2.0-i)/x_Size));*/
 }
 
-void OpenGLWindow::initializeTemperature(GridsHolder *gridsHolder){
+void OpenGLWidget::initializeTemperature(GridsHolder *gridsHolder){
 
   // here we will populate the pressure grid with its initial values
 
@@ -779,7 +858,7 @@ void OpenGLWindow::initializeTemperature(GridsHolder *gridsHolder){
 
 }
 
-void OpenGLWindow::initializeSmokeConcentration(GridsHolder *gridsHolder){
+void OpenGLWidget::initializeSmokeConcentration(GridsHolder *gridsHolder){
 
   // here we will populate the pressure grid with its initial values
 
@@ -805,7 +884,7 @@ void OpenGLWindow::initializeSmokeConcentration(GridsHolder *gridsHolder){
 
 }
 
-void OpenGLWindow::initializeVelocity(GridsHolder *gridsHolder){
+void OpenGLWidget::initializeVelocity(GridsHolder *gridsHolder){
 
   //does nothing, all initial velocities will be zero
 
@@ -827,7 +906,7 @@ void OpenGLWindow::initializeVelocity(GridsHolder *gridsHolder){
 
 }
 
-void OpenGLWindow::initializeSolid(GridsHolder *gridsHolder){
+void OpenGLWidget::initializeSolid(GridsHolder *gridsHolder){
 
   ngl::Vec3 solidSize = gridsHolder->getSolidDims();
 
@@ -858,7 +937,7 @@ void OpenGLWindow::initializeSolid(GridsHolder *gridsHolder){
 
 }*/
 
-void OpenGLWindow::bake(float _size){
+void OpenGLWidget::bake(float _size){
 
   float dx = cubeSize;
 
@@ -1025,27 +1104,27 @@ void OpenGLWindow::bake(float _size){
   isPlaying = true;
 }
 
-size_t OpenGLWindow::FrameData::xSize(){
+size_t OpenGLWidget::FrameData::xSize(){
 
   return x_Size;
 }
 
-size_t OpenGLWindow::FrameData::ySize(){
+size_t OpenGLWidget::FrameData::ySize(){
 
   return y_Size;
 }
 
-size_t OpenGLWindow::FrameData::zSize(){
+size_t OpenGLWidget::FrameData::zSize(){
 
   return z_Size;
 }
 
-bool OpenGLWindow::FrameData::addFrame(GridsHolder* gridsHolder, std::string gridName){
+bool OpenGLWidget::FrameData::addFrame(GridsHolder* gridsHolder, std::string gridName){
 
   return addFrame(gridsHolder, gridName, num_Frames);
 }
 
-bool OpenGLWindow::FrameData::addFrame(GridsHolder* gridsHolder, std::string gridName, size_t atFrame){
+bool OpenGLWidget::FrameData::addFrame(GridsHolder* gridsHolder, std::string gridName, size_t atFrame){
 
   if(atFrame > num_Frames){
       std::cout<<"Index of frame to add is not in scope of FrameData object \""<<_name<<"\"";
@@ -1135,7 +1214,7 @@ bool OpenGLWindow::FrameData::addFrame(GridsHolder* gridsHolder, std::string gri
   return false;
 }
 
-OpenGLWindow::FrameData::FrameData(size_t xSize, size_t ySize, size_t zSize){
+OpenGLWidget::FrameData::FrameData(size_t xSize, size_t ySize, size_t zSize){
 
   x_Size = xSize;
   y_Size = ySize;
@@ -1143,12 +1222,12 @@ OpenGLWindow::FrameData::FrameData(size_t xSize, size_t ySize, size_t zSize){
   num_Frames = 0;
 }
 
-size_t OpenGLWindow::FrameData::frameSize(){
+size_t OpenGLWidget::FrameData::frameSize(){
 
   return x_Size * y_Size * z_Size;
 }
 
-std::unique_ptr<GLfloat[]> OpenGLWindow::FrameData::dataToGLfloat(GLfloatTransformationMethod method){
+std::unique_ptr<GLfloat[]> OpenGLWidget::FrameData::dataToGLfloat(GLfloatTransformationMethod method){
 
   //return std::unique_ptr<GLfloat[]>(data.data());
   const int numCubeVars = 4 * 3 * 2 * 6; //4 color values/vertex * 3 vertices/tri * 2 tris/quad * 6 quads/cube
@@ -1190,6 +1269,6 @@ std::unique_ptr<GLfloat[]> OpenGLWindow::FrameData::dataToGLfloat(GLfloatTransfo
 
 }
 
-size_t OpenGLWindow::FrameData::numFrames(){
+size_t OpenGLWidget::FrameData::numFrames(){
   return num_Frames;
 }
