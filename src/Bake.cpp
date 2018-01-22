@@ -1330,7 +1330,7 @@ std::vector<GLfloat> GridsHolder::solidToFaces(ngl::Vec3 minCoords, ngl::Vec3 ma
           }
     }
 
-  std::vector<GLfloat> faces = std::vector<GLfloat>(18*rectList.size());
+  std::vector<GLfloat> faces = std::vector<GLfloat>(36*rectList.size());
 
   float xDepth, xLeft, xBottom, xRight, xTop; //the position of the face in OpenGL space
 
@@ -1340,7 +1340,9 @@ std::vector<GLfloat> GridsHolder::solidToFaces(ngl::Vec3 minCoords, ngl::Vec3 ma
 
   for(int i=0;i<rectList.size();i++){
 
-      axis = static_cast<int>(abs(rectList[i].normal)-1); //0 for X_POS or X_NEG, 1 for Y_..., 2 for Z_...
+      axis = abs(static_cast<int>(rectList[i].normal))-1; //0 for X_POS or X_NEG, 1 for Y_..., 2 for Z_...
+
+      std::cout<<rectList[i].normal<<" "<<axis;
 
       xDepth = (minCoords[axis]*(solidGridSize[axis] - rectList[i].depth) + maxCoords[axis]*(rectList[i].depth)) / solidGridSize[axis];
 
@@ -1365,6 +1367,8 @@ std::vector<GLfloat> GridsHolder::solidToFaces(ngl::Vec3 minCoords, ngl::Vec3 ma
       //|BBBBBB\|
       //4---<---3
 
+      // we will interleave vertex and RGB color data
+
       // this is to allow for the extraction of normal directions from faces[]
       if(rectList[i].normal>0){ //it is _POS -> parse faces[] normally
           inc = 1;
@@ -1372,8 +1376,10 @@ std::vector<GLfloat> GridsHolder::solidToFaces(ngl::Vec3 minCoords, ngl::Vec3 ma
         }
       else{ //it is _NEG -> parse faces[] inversely
           inc = -1;
-          fiTemp = fi + 17;
+          fiTemp = fi + 30;
         }
+
+      int fiColor = fi+3; //since all vertex colors in the two tris are the same, order of addition doesn't matter
 
       //due to the ...%3 wraparound
       //axis=0 -> XYZxyz
@@ -1381,42 +1387,49 @@ std::vector<GLfloat> GridsHolder::solidToFaces(ngl::Vec3 minCoords, ngl::Vec3 ma
       //axis=2 -> xyZXYz
 
       //face A (1->2->3)
-      faces[fiTemp+inc*(axis%3)] = xDepth;
-      faces[fiTemp+inc*((axis+1)%3)] = xTop;
-      faces[fiTemp+inc*((axis+2)%3)] = xLeft;
+      faces[fiTemp+(axis%3)] = xDepth;
+      faces[fiTemp+((axis+1)%3)] = xTop;
+      faces[fiTemp+((axis+2)%3)] = xLeft;
 
-      fiTemp+=inc*3;
+      fiTemp+=inc*6;
 
-      faces[fiTemp+inc*(axis%3)] = xDepth;
-      faces[fiTemp+inc*((axis+1)%3)] = xTop;
-      faces[fiTemp+inc*((axis+2)%3)] = xRight;
+      faces[fiTemp+(axis%3)] = xDepth;
+      faces[fiTemp+((axis+1)%3)] = xTop;
+      faces[fiTemp+((axis+2)%3)] = xRight;
 
-      fiTemp+=inc*3;
+      fiTemp+=inc*6;
 
-      faces[fiTemp+inc*(axis%3)] = xDepth;
-      faces[fiTemp+inc*((axis+1)%3)] = xBottom;
-      faces[fiTemp+inc*((axis+2)%3)] = xRight;
+      faces[fiTemp+(axis%3)] = xDepth;
+      faces[fiTemp+((axis+1)%3)] = xBottom;
+      faces[fiTemp+((axis+2)%3)] = xRight;
 
-      fiTemp+=inc*3;
+      fiTemp+=inc*6;
 
       //face B (1->3->4)
-      faces[fiTemp+inc*(axis%3)] = xDepth;
-      faces[fiTemp+inc*((axis+1)%3)] = xTop;
-      faces[fiTemp+inc*((axis+2)%3)] = xLeft;
+      faces[fiTemp+(axis%3)] = xDepth;
+      faces[fiTemp+((axis+1)%3)] = xTop;
+      faces[fiTemp+((axis+2)%3)] = xLeft;
 
-      fiTemp+=inc*3;
+      fiTemp+=inc*6;
 
-      faces[fiTemp+inc*(axis%3)] = xDepth;
-      faces[fiTemp+inc*((axis+1)%3)] = xBottom;
-      faces[fiTemp+inc*((axis+2)%3)] = xRight;
+      faces[fiTemp+(axis%3)] = xDepth;
+      faces[fiTemp+((axis+1)%3)] = xBottom;
+      faces[fiTemp+((axis+2)%3)] = xRight;
 
-      fiTemp+=inc*3;
+      fiTemp+=inc*6;
 
-      faces[fiTemp+inc*(axis%3)] = xDepth;
-      faces[fiTemp+inc*((axis+1)%3)] = xBottom;
-      faces[fiTemp+inc*((axis+2)%3)] = xLeft;
+      faces[fiTemp+(axis%3)] = xDepth;
+      faces[fiTemp+((axis+1)%3)] = xBottom;
+      faces[fiTemp+((axis+2)%3)] = xLeft;
 
-      fi+=18;
+      for (int ind=0;ind<6;ind++){
+          faces[fiColor++] = (axis==0)?1.0f:0.0f;
+          faces[fiColor++] = (axis==1)?1.0f:0.0f;
+          faces[fiColor++] = (axis==2)?1.0f:0.0f;
+          fiColor+=3;
+        }
+
+      fi+=36;
     }
 
   return faces;

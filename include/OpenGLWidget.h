@@ -40,9 +40,13 @@ class OpenGLWidget: public QOpenGLWidget
     //----------------------------------------------------------------------------------------------------------------------
     void resizeGL(int _w, int _h);
 
-    GLuint LoadShaders(const char * vertex_file_path,const char * fragment_file_path);
+    GLuint LoadShaders(const char * vertex_file_path, const char * fragment_file_path);
+
+    GLuint LoadPointShaders(const char * vertex_file_path, const char * fragment_file_path);
 
     GLuint programID;
+
+    GLuint pointProgramID;
 
     GLuint matrixID;
   private:
@@ -240,13 +244,13 @@ class OpenGLWidget: public QOpenGLWidget
     std::vector<GLfloat> solidFacesData;
 
     // Initial position : on -Z
-    const glm::vec3 initialPosition = glm::vec3( 0, 0, -2 );
+    const glm::vec3 initialPosition = glm::vec3( -2, 0, 0 );
     glm::vec3 position;
     // Initial focus point
     const glm::vec3 initialFocusPoint = glm::vec3(0,0,0);
     glm::vec3 focusPoint;
     // Initial horizontal angle : toward -Z
-    const float initialHorizontalAngle = 3.14f;
+    const float initialHorizontalAngle = -3.14f/2;
     float horizontalAngle;
     // Initial vertical angle : none
     const float initialVerticalAngle = 0.0f;

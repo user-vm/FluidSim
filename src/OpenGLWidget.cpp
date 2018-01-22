@@ -243,7 +243,7 @@ void OpenGLWidget::makePoints(GLfloat _size)
 
     qint64 kVertex=-1, kColor = m_colorOffset-1, kPres = -1;
 
-    std::unique_ptr<GLfloat []>vertexData( new GLfloat[m_vboSize]);
+    std::vector<GLfloat> vertexData = std::vector<GLfloat>(m_fluidVboSize);
 
     for(size_t d1=0;d1<xSimSize;d1++){
       for(size_t d2=0;d2<ySimSize;d2++){
@@ -288,6 +288,7 @@ void OpenGLWidget::makePoints(GLfloat _size)
 
     // Create and compile our GLSL program from the shaders
     programID = LoadShaders( "shaders/SimpleVertexShader.glsl", "shaders/SimpleFragmentShader.glsl" );
+    pointProgramID = LoadShaders("shaders/PointVertexShader.glsl", "shaders/PointFragmentShader.glsl");
 
     GLuint VertexArrayID;
     glGenVertexArrays(1, &VertexArrayID);
@@ -314,16 +315,114 @@ void OpenGLWidget::makePoints(GLfloat _size)
     // Give our vertices to OpenGL.
     if(useTriangle)
       glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_DYNAMIC_DRAW);
-    else
-      glBufferData(GL_ARRAY_BUFFER, solidFacesData.size()*sizeof(GLfloat), solidFacesData.data(), GL_DYNAMIC_DRAW);
+    else{
+      glBufferData(GL_ARRAY_BUFFER, (solidFacesData.size()+vertexData.size())*sizeof(GLfloat), NULL, GL_DYNAMIC_DRAW);
+      glBufferSubData(GL_ARRAY_BUFFER, 0, solidFacesData.size()*sizeof(GLfloat),solidFacesData.data());
+      glBufferSubData(GL_ARRAY_BUFFER, solidFacesData.size()*sizeof(GLfloat), vertexData.size()*sizeof(GLfloat),vertexData.data());}
 }
 
-// from opengl-tutorial.org
+// from opengl-tutorial.org (distributed under a DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE)
 GLuint OpenGLWidget::LoadShaders(const char * vertex_file_path,const char * fragment_file_path){
 
 	// Create the shaders
 	GLuint VertexShaderID = glCreateShader(GL_VERTEX_SHADER);
 	GLuint FragmentShaderID = glCreateShader(GL_FRAGMENT_SHADER);
+
+	// Read the Vertex Shader code from the file
+	std::string VertexShaderCode;
+	std::ifstream VertexShaderStream(vertex_file_path, std::ios::in);
+	if(VertexShaderStream.is_open()){
+		std::stringstream sstr;
+		sstr << VertexShaderStream.rdbuf();
+		VertexShaderCode = sstr.str();
+		VertexShaderStream.close();
+	}else{
+		printf("Impossible to open %s. Are you in the right directory ? Don't forget to read the FAQ !\n", vertex_file_path);
+		getchar();
+		return 0;
+	}
+
+	// Read the Fragment Shader code from the file
+	std::string FragmentShaderCode;
+	std::ifstream FragmentShaderStream(fragment_file_path, std::ios::in);
+	if(FragmentShaderStream.is_open()){
+		std::stringstream sstr;
+		sstr << FragmentShaderStream.rdbuf();
+		FragmentShaderCode = sstr.str();
+		FragmentShaderStream.close();
+	}
+
+	GLint Result = GL_FALSE;
+	int InfoLogLength;
+
+
+	// Compile Vertex Shader
+	printf("Compiling shader : %s\n", vertex_file_path);
+	char const * VertexSourcePointer = VertexShaderCode.c_str();
+	glShaderSource(VertexShaderID, 1, &VertexSourcePointer , NULL);
+	glCompileShader(VertexShaderID);
+
+	// Check Vertex Shader
+	glGetShaderiv(VertexShaderID, GL_COMPILE_STATUS, &Result);
+	glGetShaderiv(VertexShaderID, GL_INFO_LOG_LENGTH, &InfoLogLength);
+	if ( InfoLogLength > 0 ){
+		std::vector<char> VertexShaderErrorMessage(InfoLogLength+1);
+		glGetShaderInfoLog(VertexShaderID, InfoLogLength, NULL, &VertexShaderErrorMessage[0]);
+		printf("%s\n", &VertexShaderErrorMessage[0]);
+	}
+
+
+
+	// Compile Fragment Shader
+	printf("Compiling shader : %s\n", fragment_file_path);
+	char const * FragmentSourcePointer = FragmentShaderCode.c_str();
+	glShaderSource(FragmentShaderID, 1, &FragmentSourcePointer , NULL);
+	glCompileShader(FragmentShaderID);
+
+	// Check Fragment Shader
+	glGetShaderiv(FragmentShaderID, GL_COMPILE_STATUS, &Result);
+	glGetShaderiv(FragmentShaderID, GL_INFO_LOG_LENGTH, &InfoLogLength);
+	if ( InfoLogLength > 0 ){
+		std::vector<char> FragmentShaderErrorMessage(InfoLogLength+1);
+		glGetShaderInfoLog(FragmentShaderID, InfoLogLength, NULL, &FragmentShaderErrorMessage[0]);
+		printf("%s\n", &FragmentShaderErrorMessage[0]);
+	}
+
+
+
+	// Link the program
+	printf("Linking program\n");
+	GLuint ProgramID = glCreateProgram();
+	glAttachShader(ProgramID, VertexShaderID);
+	glAttachShader(ProgramID, FragmentShaderID);
+	glLinkProgram(ProgramID);
+
+	// Check the program
+	glGetProgramiv(ProgramID, GL_LINK_STATUS, &Result);
+	glGetProgramiv(ProgramID, GL_INFO_LOG_LENGTH, &InfoLogLength);
+	if ( InfoLogLength > 0 ){
+		std::vector<char> ProgramErrorMessage(InfoLogLength+1);
+		glGetProgramInfoLog(ProgramID, InfoLogLength, NULL, &ProgramErrorMessage[0]);
+		printf("%s\n", &ProgramErrorMessage[0]);
+	}
+
+
+	glDetachShader(ProgramID, VertexShaderID);
+	glDetachShader(ProgramID, FragmentShaderID);
+
+	glDeleteShader(VertexShaderID);
+	glDeleteShader(FragmentShaderID);
+
+	return ProgramID;
+}
+
+// modified from opengl-tutorial.org (original distributed under a DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE)
+GLuint OpenGLWidget::LoadShaders(const char * vertex_file_path,const char * fragment_file_path, const char * geometry_file_path){
+
+	// Create the shaders
+	GLuint VertexShaderID = glCreateShader(GL_VERTEX_SHADER);
+	GLuint FragmentShaderID = glCreateShader(GL_FRAGMENT_SHADER);
+	GLuint PointShaderID = glCreateShader(GL_FRAGMENT_SHADER);
 
 	// Read the Vertex Shader code from the file
 	std::string VertexShaderCode;
@@ -470,23 +569,73 @@ void OpenGLWidget::paintGL()
 
   // 1rst attribute buffer : vertices
   glEnableVertexAttribArray(0);
+  glEnableVertexAttribArray(1);
+  //glEnableClientState(GL_COLOR_ARRAY);
   glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
+
+  //first the vertex positions
   glVertexAttribPointer(
      0,                  // attribute 0. No particular reason for 0, but must match the layout in the shader.
      3,                  // size
      GL_FLOAT,           // type
      GL_FALSE,           // normalized?
-     0,                  // stride
+     6*sizeof(GLfloat),  // stride
      (void*)0            // array buffer offset
   );
 
-  // Draw the triangle !
-  //glRotatef(36,0,0,1); //doesn't work, probably need shader-side rotation
+  //now the color
+  glVertexAttribPointer(
+        1,
+        3,
+        GL_FLOAT,
+        GL_FALSE,
+        6*sizeof(GLfloat),
+        (void*)(3*sizeof(GLfloat)));
+
   if(useTriangle)
     glDrawArrays(GL_TRIANGLES, 0, 3);
   else
-    glDrawArrays(GL_TRIANGLES, 0, solidFacesData.size()/3); // Starting from vertex 0; 3 vertices total -> 1 triangle
+    glDrawArrays(GL_TRIANGLES, 0, solidFacesData.size()/6); // Starting from vertex 0; 3 vertices total -> 1 triangle
+
   glDisableVertexAttribArray(0);
+  glDisableVertexAttribArray(1);
+
+  glUseProgram(pointProgramID);
+
+  glEnableVertexAttribArray(0);
+  glEnableVertexAttribArray(1);
+
+  //now the vertex positions of the points
+  glVertexAttribPointer(
+        0,
+        3,
+        GL_FLOAT,
+        GL_FALSE,
+        7*sizeof(GLfloat),
+        (void*)(solidFacesData.size()*sizeof(GLfloat)));
+
+  //now the color of the points
+  glVertexAttribPointer(
+        1,
+        4,
+        GL_FLOAT,
+        GL_FALSE,
+        7*sizeof(GLfloat),
+        (void*)((3+solidFacesData.size())*sizeof(GLfloat)));
+
+  // Draw the triangle !
+  //glRotatef(36,0,0,1); //doesn't work, probably need shader-side rotation
+  //glPushMatrix();
+  //glRotatef(90,1,0,0);
+  if(useTriangle)
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+  else
+    glDrawArrays(GL_POINTS,solidFacesData.size()/6,xSimSize*ySimSize*zSimSize);
+
+  glDisableVertexAttribArray(0);
+  glDisableVertexAttribArray(1);
+  //glPopMatrix();
+  //glDisableClientState(GL_COLOR_ARRAY);
 
   a_value++;
 
@@ -517,6 +666,7 @@ void OpenGLWidget::mousePressEvent(QMouseEvent *_event){
         horizontalAngleOnLeftClick = horizontalAngle;
         verticalAngleOnLeftClick = verticalAngle;
         std::cout<<"LB pressed at "<<timer.elapsed()<<"\n";
+        std::cout<<"pos= "<<position[0]<<" "<<position[1]<<" "<<position[2]<<"\n";
         break;
       }
     case Qt::RightButton:{
@@ -604,7 +754,7 @@ void OpenGLWidget::mouseMoveEvent(QMouseEvent *_event)
         //glfwSetCursorPos(window, 1024/2, 768/2);
 
         // Compute new orientation
-        horizontalAngle = horizontalAngleOnLeftClick - mouseSpeed * float(mousePosOnLeftClick.m_x-xPos);
+        horizontalAngle = horizontalAngleOnLeftClick + mouseSpeed * float(mousePosOnLeftClick.m_x-xPos);
         verticalAngle   = verticalAngleOnLeftClick - mouseSpeed * float(mousePosOnLeftClick.m_y-yPos);
 
         // Direction : Spherical coordinates to Cartesian coordinates conversion
@@ -913,6 +1063,15 @@ void OpenGLWidget::initializeSolid(GridsHolder *gridsHolder){
   for(size_t i=0;i<solidSize.m_x;i++)
     for(size_t j=0;j<solidSize.m_z;j++)
       gridsHolder->setSolid(i,0,j,true);
+
+  for(size_t i=2;i<6;i++)
+    for(size_t j=3;j<8;j++)
+      gridsHolder->setSolid(i,2,j,true);
+
+  gridsHolder->setSolid(1,1,1,true);
+  gridsHolder->setSolid(solidSize.m_x-1,1,solidSize.m_z-1,true);
+  gridsHolder->setSolid(1,1,solidSize.m_z-1,true);
+  gridsHolder->setSolid(solidSize.m_x-1,1,1,true);
 }
 
 /*  x_Size = v->xSize();

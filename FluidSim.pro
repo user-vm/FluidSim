@@ -74,5 +74,7 @@ linux:LIBS+=-lGLEW
 DISTFILES += \
     shaders/SimpleFragmentShader.glsl \
     shaders/SimpleVertexShader.glsl \
+    shaders/PointFragmentShader.glsl \
+    shaders/PointVertexShader.glsl \
     shaders/PhongFragment.glsl \
     shaders/PhongVertex.glsl
