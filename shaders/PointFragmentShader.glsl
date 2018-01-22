@@ -1,14 +1,13 @@
 #version 330 core
 
-in vec3 vertexColorOut;
+//in vec4 vertexColorOut;
 
 // Output data
-//out vec4 gl_FragColor;
+out vec4 out_color;
 
 void main()
 {
 
     // Output color unmodified
-    //gl_FragColor = vertexColorOut;
-
+    out_color = vec4(1.0,1.0,0.0,1.0);
 }

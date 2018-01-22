@@ -42,7 +42,7 @@ class OpenGLWidget: public QOpenGLWidget
 
     GLuint LoadShaders(const char * vertex_file_path, const char * fragment_file_path);
 
-    GLuint LoadPointShaders(const char * vertex_file_path, const char * fragment_file_path);
+    GLuint LoadPointShaders(const char * vertex_file_path, const char * fragment_file_path, const char * geometry_file_path);
 
     GLuint programID;
 

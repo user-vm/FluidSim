@@ -288,7 +288,7 @@ void OpenGLWidget::makePoints(GLfloat _size)
 
     // Create and compile our GLSL program from the shaders
     programID = LoadShaders( "shaders/SimpleVertexShader.glsl", "shaders/SimpleFragmentShader.glsl" );
-    pointProgramID = LoadShaders("shaders/PointVertexShader.glsl", "shaders/PointFragmentShader.glsl");
+    pointProgramID = LoadShaders("shaders/PointVertexShader.glsl", "shaders/PointFragmentShader.glsl");//, "shaders/PointGeometryShader.glsl");
 
     GLuint VertexArrayID;
     glGenVertexArrays(1, &VertexArrayID);
@@ -297,7 +297,7 @@ void OpenGLWidget::makePoints(GLfloat _size)
     // Get a handle for our "MVP" uniform
     matrixID = glGetUniformLocation(programID, "MVP");
 
-    //std::cout<<glGetError()<<"\n";
+    std::cout<<glGetError()<<"\n";
 
     static const GLfloat g_vertex_buffer_data[] = {
             -1.0f, -1.0f, 0.0f,
@@ -417,12 +417,12 @@ GLuint OpenGLWidget::LoadShaders(const char * vertex_file_path,const char * frag
 }
 
 // modified from opengl-tutorial.org (original distributed under a DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE)
-GLuint OpenGLWidget::LoadShaders(const char * vertex_file_path,const char * fragment_file_path, const char * geometry_file_path){
+GLuint OpenGLWidget::LoadPointShaders(const char * vertex_file_path,const char * fragment_file_path, const char * geometry_file_path){
 
 	// Create the shaders
 	GLuint VertexShaderID = glCreateShader(GL_VERTEX_SHADER);
 	GLuint FragmentShaderID = glCreateShader(GL_FRAGMENT_SHADER);
-	GLuint PointShaderID = glCreateShader(GL_FRAGMENT_SHADER);
+	GLuint GeometryShaderID = glCreateShader(GL_GEOMETRY_SHADER);
 
 	// Read the Vertex Shader code from the file
 	std::string VertexShaderCode;
@@ -446,6 +446,16 @@ GLuint OpenGLWidget::LoadShaders(const char * vertex_file_path,const char * frag
 		sstr << FragmentShaderStream.rdbuf();
 		FragmentShaderCode = sstr.str();
 		FragmentShaderStream.close();
+	}
+
+	// Read the Fragment Shader code from the file
+	std::string GeometryShaderCode;
+	std::ifstream GeometryShaderStream(fragment_file_path, std::ios::in);
+	if(FragmentShaderStream.is_open()){
+		std::stringstream sstr;
+		sstr << GeometryShaderStream.rdbuf();
+		GeometryShaderCode = sstr.str();
+		GeometryShaderStream.close();
 	}
 
 	GLint Result = GL_FALSE;
@@ -484,13 +494,27 @@ GLuint OpenGLWidget::LoadShaders(const char * vertex_file_path,const char * frag
 		printf("%s\n", &FragmentShaderErrorMessage[0]);
 	}
 
+	// Compile Geometry Shader
+	printf("Compiling shader : %s\n", geometry_file_path);
+	char const * GeometrySourcePointer = GeometryShaderCode.c_str();
+	glShaderSource(GeometryShaderID, 1, &GeometrySourcePointer , NULL);
+	glCompileShader(GeometryShaderID);
 
+	// Check Geometry Shader
+	glGetShaderiv(GeometryShaderID, GL_COMPILE_STATUS, &Result);
+	glGetShaderiv(GeometryShaderID, GL_INFO_LOG_LENGTH, &InfoLogLength);
+	if ( InfoLogLength > 0 ){
+		std::vector<char> GeometryShaderErrorMessage(InfoLogLength+1);
+		glGetShaderInfoLog(GeometryShaderID, InfoLogLength, NULL, &GeometryShaderErrorMessage[0]);
+		printf("%s\n", &GeometryShaderErrorMessage[0]);
+	}
 
 	// Link the program
 	printf("Linking program\n");
 	GLuint ProgramID = glCreateProgram();
 	glAttachShader(ProgramID, VertexShaderID);
 	glAttachShader(ProgramID, FragmentShaderID);
+	glAttachShader(ProgramID, GeometryShaderID);
 	glLinkProgram(ProgramID);
 
 	// Check the program
@@ -505,9 +529,12 @@ GLuint OpenGLWidget::LoadShaders(const char * vertex_file_path,const char * frag
 
 	glDetachShader(ProgramID, VertexShaderID);
 	glDetachShader(ProgramID, FragmentShaderID);
+	glDetachShader(ProgramID, GeometryShaderID);
 
 	glDeleteShader(VertexShaderID);
 	glDeleteShader(FragmentShaderID);
+	glDeleteShader(GeometryShaderID);
+
 
 	return ProgramID;
 }
@@ -600,6 +627,7 @@ void OpenGLWidget::paintGL()
   glDisableVertexAttribArray(0);
   glDisableVertexAttribArray(1);
 
+  glEnable(GL_PROGRAM_POINT_SIZE);
   glUseProgram(pointProgramID);
 
   glEnableVertexAttribArray(0);
@@ -622,6 +650,8 @@ void OpenGLWidget::paintGL()
         GL_FALSE,
         7*sizeof(GLfloat),
         (void*)((3+solidFacesData.size())*sizeof(GLfloat)));
+
+  glEnable(GL_PROGRAM_POINT_SIZE);
 
   // Draw the triangle !
   //glRotatef(36,0,0,1); //doesn't work, probably need shader-side rotation
