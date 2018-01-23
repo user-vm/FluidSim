@@ -2,21 +2,25 @@
 
 // Input vertex data, different for all executions of this shader.
 layout(location = 0) in vec3 vertexPosition_modelspace;
-layout(location = 1) in vec4 vertexColorIn;
+layout(location = 1) in float pointSize;
 
-//out vec4 gl_Color;
-//out float gl_PointSize;
-out vec4 gl_Position;
+out vec3 vertexColorOut;
 
 uniform mat4 MVP;
+uniform float maxSize;
+uniform float maxSizeCutoff;
+uniform vec3 pointColor;
 
 void main(){
 
     //gl_PointSize = 5.0;
     gl_Position =  MVP * vec4(vertexPosition_modelspace,1.0);
 
-    gl_PointSize = 5.0;
+    if(pointSize*maxSize <= maxSizeCutoff)
+        gl_PointSize = pointSize*maxSize;
+    else
+        gl_PointSize = maxSize;
 
-    //gl_Color = vertexColorIn;
+    vertexColorOut = pointColor;
 }
 

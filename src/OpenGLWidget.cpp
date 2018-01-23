@@ -87,7 +87,7 @@ void OpenGLWidget::initializeGL()
   pointSize = GLfloat(m_viewport[3])/2.0*cubeSize*10;
 
   bake(cubeSize);
-  makePoints(cubeSize);
+  makePoints();
 
   std::cout<<"m_width = "<<m_width<<"; m_height = "<<m_height<<"\n";
 }
@@ -226,62 +226,8 @@ void  OpenGLWidget::makeCubes( GLfloat _size)
 
 }
 
-void OpenGLWidget::makePoints(GLfloat _size)
+void OpenGLWidget::makePoints()
   {
-    // allocate enough space for our verts
-    // as we are doing lines it will be 2 verts per line
-    // and we need to add 1 to each of them for the <= loop
-    // and finally muliply by 12 as we have 12 values per line pair
-    m_pointSubVBOSize=3+totalFrames*4;//the 7 is from 4 color values// 6 + totalFrames coordinates per vertex for now, 3 vertices/tri, 2 tris/quad, 6 quads/cube //3 coordinates per vertex, 3 vertices per tri, 2 tris per quad, 6 quads per cube, 3 data types (vertex, normal, colour)
-    m_fluidVboSize= m_pointSubVBOSize*xSimSize*ySimSize*zSimSize;
-    m_solidVboSize = solidFacesData.size();
-
-    m_vboSize = m_fluidVboSize + m_solidVboSize;
-
-    // all vertex position data, all normal data, all color data
-    m_colorOffset = 3*xSimSize*ySimSize*zSimSize;
-
-    qint64 kVertex=-1, kColor = m_colorOffset-1, kPres = -1;
-
-    std::vector<GLfloat> vertexData = std::vector<GLfloat>(m_fluidVboSize);
-
-    for(size_t d1=0;d1<xSimSize;d1++){
-      for(size_t d2=0;d2<ySimSize;d2++){
-        for(size_t d3=0;d3<zSimSize;d3++){
-
-            //add vertices in three by three, because each vertex in a tri has the same normal vector
-            //if(gc==0){
-            vertexData[++kVertex]=(d1*1 - xSimSize/2.0)*_size;
-            vertexData[++kVertex]=(d2*1 - ySimSize/2.0)*_size;
-            vertexData[++kVertex]=(d3*1 - zSimSize/2.0)*_size;//}
-
-            //vertex color
-            //std::cout<<"("<<mainColorData[kPres-4]<<" "<<mainColorData[kPres-3]<<" "<<mainColorData[kPres-2]<<" "<<mainColorData[kPres-1]<<") ";
-            for(int gc=0;gc<totalFrames;gc++){
-                vertexData[++kColor]=mainColorData[++kPres];//0.5 + d1*0.5/xSimSize;// + verts[i+t].m_x;
-                vertexData[++kColor]=mainColorData[++kPres];//0.5 + d2*0.5/ySimSize;// + verts[i+t].m_y;
-                vertexData[++kColor]=mainColorData[++kPres];//0.5 + d3*0.5/zSimSize;// + verts[i+t].m_z;
-                vertexData[++kColor]=mainColorData[++kPres];}//0.5;}
-
-        //std::cout<<"\n";
-        }
-      //std::cout<<"---new row---\n";
-      }
-    //std::cout<<"\n+++NEW FRAME+++\n\n";
-    }
-
-    std::cout<<"kColor = "<<kColor<<"; kVertex = "<<kVertex<<"\n";
-
-    qint64 kSolid=m_fluidVboSize-1;
-    /*
-    for(size_t d1=0;d1<m_solidVboSize;d1++)
-      //vertexData[++kSolid] = solidFacesData[d1];
-      std::cout<<
-    */
-    // now we will create our VBO first we need to ask GL for an Object ID
-
-    /*for(size_t d1=0;d1<kVertex;d1++)
-      std::cout<<vertexData[d1]<<" ";*/
 
     // Dark blue background
     glClearColor(0.0f, 0.0f, 0.4f, 0.0f);
@@ -296,6 +242,8 @@ void OpenGLWidget::makePoints(GLfloat _size)
 
     // Get a handle for our "MVP" uniform
     matrixID = glGetUniformLocation(programID, "MVP");
+    maximumSizeID = glGetUniformLocation(programID, "maximumSize");
+    maximumSizeCutoffID = glGetUniformLocation(programID, "maximumSizeCutoffID");
 
     std::cout<<glGetError()<<"\n";
 
@@ -316,9 +264,9 @@ void OpenGLWidget::makePoints(GLfloat _size)
     if(useTriangle)
       glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_DYNAMIC_DRAW);
     else{
-      glBufferData(GL_ARRAY_BUFFER, (solidFacesData.size()+vertexData.size())*sizeof(GLfloat), NULL, GL_DYNAMIC_DRAW);
+      glBufferData(GL_ARRAY_BUFFER, (solidFacesData.size()+mainColorData.size())*sizeof(GLfloat), NULL, GL_DYNAMIC_DRAW);
       glBufferSubData(GL_ARRAY_BUFFER, 0, solidFacesData.size()*sizeof(GLfloat),solidFacesData.data());
-      glBufferSubData(GL_ARRAY_BUFFER, solidFacesData.size()*sizeof(GLfloat), vertexData.size()*sizeof(GLfloat),vertexData.data());}
+      glBufferSubData(GL_ARRAY_BUFFER, solidFacesData.size()*sizeof(GLfloat), mainColorData.size()*sizeof(GLfloat),mainColorData.data());}
 }
 
 // from opengl-tutorial.org (distributed under a DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE)
@@ -589,6 +537,9 @@ void OpenGLWidget::paintGL()
   //MVP = glm::rotate(MVP, glm::radians(timer.elapsed()/1000.0f*10.0f), glm::vec3(1.0f, 0.0f, 0.0f));
 
   glUniformMatrix4fv(matrixID, 1, GL_FALSE, &MVP[0][0]);
+  glUniform3fv(colorSolidXID,3, &colorSolidX[0]);
+  glUniform3fv(colorSolidYID,3, &colorSolidY[0]);
+  glUniform3fv(colorSolidZID,3, &colorSolidZ[0]);
 
   //GLfloat transMatVals[16];
   //glGetUniformfv(programID,matrixID,transMatVals);
@@ -606,17 +557,17 @@ void OpenGLWidget::paintGL()
      3,                  // size
      GL_FLOAT,           // type
      GL_FALSE,           // normalized?
-     6*sizeof(GLfloat),  // stride
+     3*sizeof(GLfloat)+sizeof(GLint),  // stride
      (void*)0            // array buffer offset
   );
 
   //now the color
   glVertexAttribPointer(
         1,
-        3,
-        GL_FLOAT,
+        1,
+        GL_INT,
         GL_FALSE,
-        6*sizeof(GLfloat),
+        3*sizeof(GLfloat)+sizeof(GLint),
         (void*)(3*sizeof(GLfloat)));
 
   if(useTriangle)
@@ -627,11 +578,15 @@ void OpenGLWidget::paintGL()
   glDisableVertexAttribArray(0);
   glDisableVertexAttribArray(1);
 
-  glEnable(GL_PROGRAM_POINT_SIZE);
   glUseProgram(pointProgramID);
+
+  glUniformMatrix4fv(matrixID, 1, GL_FALSE, &MVP[0][0]);
+  glUniform1f(maximumSizeID, maximumSize);
+  glUniform1f(maximumSizeCutoffID, maximumSizeCutoff);
 
   glEnableVertexAttribArray(0);
   glEnableVertexAttribArray(1);
+  glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
 
   //now the vertex positions of the points
   glVertexAttribPointer(
@@ -639,37 +594,39 @@ void OpenGLWidget::paintGL()
         3,
         GL_FLOAT,
         GL_FALSE,
-        7*sizeof(GLfloat),
+        4*sizeof(GLfloat),
         (void*)(solidFacesData.size()*sizeof(GLfloat)));
+        /*
+        7*sizeof(GLfloat),
+        (void*)(solidFacesData.size()*sizeof(GLfloat)));*/
 
   //now the color of the points
   glVertexAttribPointer(
         1,
-        4,
+        1,
         GL_FLOAT,
         GL_FALSE,
-        7*sizeof(GLfloat),
+        4*sizeof(GLfloat),
         (void*)((3+solidFacesData.size())*sizeof(GLfloat)));
+        /*
+        7*sizeof(GLfloat),
+        (void*)((3+solidFacesData.size())*sizeof(GLfloat)));*/
 
+  //glEnable(GL_BLEND);
+  //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   glEnable(GL_PROGRAM_POINT_SIZE);
 
-  // Draw the triangle !
-  //glRotatef(36,0,0,1); //doesn't work, probably need shader-side rotation
-  //glPushMatrix();
-  //glRotatef(90,1,0,0);
+  uint currentFrame = int(timer.elapsed()/(frameDuration*1000.0)-timerOffset)%totalFrames;
+
   if(useTriangle)
     glDrawArrays(GL_TRIANGLES, 0, 3);
   else
-    glDrawArrays(GL_POINTS,solidFacesData.size()/6,xSimSize*ySimSize*zSimSize);
+    glDrawArrays(GL_POINTS,pointFrameOffset[currentFrame],xSimSize*ySimSize*zSimSize);
 
   glDisableVertexAttribArray(0);
   glDisableVertexAttribArray(1);
-  //glPopMatrix();
-  //glDisableClientState(GL_COLOR_ARRAY);
 
-  a_value++;
-
-  //std::cout<<glGetError()<<"\n";
+  std::cout<<glGetError()<<"\n";
 
 }
 
@@ -1277,7 +1234,10 @@ void OpenGLWidget::bake(float _size){
   grids.reset();
 
   //tempColorData = tempFrameData->dataToGLfloat(FrameData::WHOLE_CUBE);
-  mainColorData = mainFrameData->dataToGLfloat(FrameData::CENTER_POINTS);
+  mainColorData = mainFrameData->dataToGLfloat(FrameData::CENTER_POINTS,
+                                               pointFrameOffset,
+                                               ngl::Vec3(-xSimSize/2.0*_size,-ySimSize/2.0*_size,-zSimSize/2.0*_size),
+                                               ngl::Vec3(xSimSize/2.0*_size,ySimSize/2.0*_size,zSimSize/2.0*_size));
   //uColorData = uFrameData->dataToGLfloat(FrameData::CUBE_WALL_X);
   //vColorData = vFrameData->dataToGLfloat(FrameData::CUBE_WALL_Y);
   //wColorData = wFrameData->dataToGLfloat(FrameData::CUBE_WALL_Z);
@@ -1416,20 +1376,24 @@ size_t OpenGLWidget::FrameData::frameSize(){
   return x_Size * y_Size * z_Size;
 }
 
-std::unique_ptr<GLfloat[]> OpenGLWidget::FrameData::dataToGLfloat(GLfloatTransformationMethod method){
+std::vector<GLfloat> OpenGLWidget::FrameData::dataToGLfloat(GLfloatTransformationMethod method, std::vector<GLint> &pointFrameOffset, ngl::Vec3 minCoords, ngl::Vec3 maxCoords){
 
   //return std::unique_ptr<GLfloat[]>(data.data());
   const int numCubeVars = 4 * 3 * 2 * 6; //4 color values/vertex * 3 vertices/tri * 2 tris/quad * 6 quads/cube
 
-  std::unique_ptr<GLfloat[]> floatData(new GLfloat[frameSize()*numFrames()*((method==WHOLE_CUBE)?numCubeVars:4)]);
+  std::vector<GLfloat> floatData = std::vector<GLfloat>();
+  pointFrameOffset.resize(num_Frames);
 
   float maxVal = (*(std::max_element(data.begin(),data.end())));
 
   std::cout<<"MAX="<<maxVal<<"\n";
 
-  size_t k = 0, k2 = 0;
+  size_t k2 = 0;
 
   std::cout<<"METHOD="<<method<<"\n";
+
+  if(maxVal==0)
+    return floatData;
 
   if(method == WHOLE_CUBE) //this is the easiest to implement, start with this
     for(size_t i_fr = 0;i_fr<num_Frames;i_fr++)
@@ -1438,21 +1402,25 @@ std::unique_ptr<GLfloat[]> OpenGLWidget::FrameData::dataToGLfloat(GLfloatTransfo
           for(size_t i_z=0;i_z<z_Size;i_z++,k2++)
             for(size_t i_c=0;i_c<numCubeVars/4;i_c++){
 
-              floatData[k++] = 1;
-              floatData[k++] = 1;
-              floatData[k++] = 0;
-              floatData[k++] = 1;}//(maxVal==0)?0:(data[k2]/maxVal);}
+              floatData.push_back(1);
+              floatData.push_back(1);
+              floatData.push_back(0);
+              floatData.push_back((maxVal==0)?0:(data[k2]/maxVal));}
 
   if(method == CENTER_POINTS)
-    for(size_t i_fr = 0;i_fr<num_Frames;i_fr++)
+    for(size_t i_fr = 0;i_fr<num_Frames;i_fr++){
       for(size_t i_x=0;i_x<x_Size;i_x++)
         for(size_t i_y=0;i_y<y_Size;i_y++)
-          for(size_t i_z=0;i_z<z_Size;i_z++,k2++){
+          for(size_t i_z=0;i_z<z_Size;i_z++,k2++)
 
-            floatData[k++] = 1;
-            floatData[k++] = 1;
-            floatData[k++] = 0;
-            floatData[k++] = 1;}//(maxVal==0)?0:(data[k2]/maxVal);}
+            if(data[k2]){
+                floatData.push_back((minCoords.m_x*(x_Size-i_x-0.5)+maxCoords.m_x*(i_x+0.5))/x_Size);
+                floatData.push_back((minCoords.m_y*(y_Size-i_y-0.5)+maxCoords.m_y*(i_y+0.5))/y_Size);
+                floatData.push_back((minCoords.m_z*(z_Size-i_z-0.5)+maxCoords.m_z*(i_z+0.5))/z_Size);
+                floatData.push_back((maxVal==0)?0:(data[k2]/maxVal));}
+
+      if(i_fr<num_Frames-1)
+        pointFrameOffset[i_fr] = k2;}
 
   return floatData;
 

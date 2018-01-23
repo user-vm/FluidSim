@@ -48,7 +48,29 @@ class OpenGLWidget: public QOpenGLWidget
 
     GLuint pointProgramID;
 
-    GLuint matrixID;
+    //IDs for uniform
+    GLint matrixID;
+    GLint maximumSizeID;
+    GLint maximumSizeCutoffID;
+    GLint colorSolidXID;
+    GLint colorSolidYID;
+    GLint colorSolidZID;
+
+    GLfloat maximumSize = 10.0f;
+    GLfloat maximumSizeCutoff = 20.0f;
+    glm::vec3 colorSolidX = glm::vec3(1.0,0.0,0.0);
+    glm::vec3 colorSolidY = glm::vec3(0.0,1.0,0.0);
+    glm::vec3 colorSolidZ = glm::vec3(0.0,0.0,1.0);
+
+    std::vector<GLint> pointFrameOffset;
+
+    struct sizedPoint{
+      GLfloat x;
+      GLfloat y;
+      GLfloat z;
+      GLfloat axis; //negative value means X, value 0 means Y, positive value means Z
+    };
+
   private:
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief event called by the timer to allow use to re-draw / animate
@@ -79,7 +101,7 @@ class OpenGLWidget: public QOpenGLWidget
     /// @brief a simple draw grid function
     /// @param[in] _size the size of the grid (width and height)
     /// @returns a pointer to the allocated VBO
-    void  makePoints(GLfloat _size);
+    void  makePoints();
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief function to add new animation frame of grid pressure data
     //----------------------------------------------------------------------------------------------------------------------
@@ -239,7 +261,7 @@ class OpenGLWidget: public QOpenGLWidget
     std::unique_ptr<GLfloat[]> uColorData;
     std::unique_ptr<GLfloat[]> vColorData;
     std::unique_ptr<GLfloat[]> wColorData;
-    std::unique_ptr<GLfloat[]> mainColorData;
+    std::vector<GLfloat> mainColorData;
 
     std::vector<GLfloat> solidFacesData;
 
@@ -311,7 +333,7 @@ class OpenGLWidget: public QOpenGLWidget
       bool addFrame(GridsHolder* gridsHolder, std::string gridName);
       bool addFrame(GridsHolder* gridsHolder, std::string gridName, size_t index);
 
-      std::unique_ptr<GLfloat[]> dataToGLfloat(GLfloatTransformationMethod method);
+      std::vector<GLfloat> dataToGLfloat(GLfloatTransformationMethod method, std::vector<GLint> &pointFrameOffset, ngl::Vec3 minCoords, ngl::Vec3 maxCoords);
 
     private:
       std::vector<float> data;
