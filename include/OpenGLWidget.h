@@ -50,17 +50,20 @@ class OpenGLWidget: public QOpenGLWidget
 
     //IDs for uniform
     GLint matrixID;
+    GLint matrixPointID;
     GLint maximumSizeID;
     GLint maximumSizeCutoffID;
     GLint colorSolidXID;
     GLint colorSolidYID;
     GLint colorSolidZID;
+    GLint pointColorID;
 
     GLfloat maximumSize = 10.0f;
     GLfloat maximumSizeCutoff = 20.0f;
     glm::vec3 colorSolidX = glm::vec3(1.0,0.0,0.0);
     glm::vec3 colorSolidY = glm::vec3(0.0,1.0,0.0);
     glm::vec3 colorSolidZ = glm::vec3(0.0,0.0,1.0);
+    glm::vec3 pointColor = glm::vec3(1.0,1.0,0.0);
 
     std::vector<GLint> pointFrameOffset;
 
@@ -92,11 +95,6 @@ class OpenGLWidget: public QOpenGLWidget
     /// @brief process scroll events
     //----------------------------------------------------------------------------------------------------------------------
     void wheelEvent(QWheelEvent *);
-    //----------------------------------------------------------------------------------------------------------------------
-    /// @brief a simple draw grid function
-    /// @param[in] _size the size of the grid (width and height)
-    /// @returns a pointer to the allocated VBO
-    void  makeCubes(GLfloat _size);
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief a simple draw grid function
     /// @param[in] _size the size of the grid (width and height)
@@ -135,11 +133,10 @@ class OpenGLWidget: public QOpenGLWidget
     //----------------------------------------------------------------------------------------------------------------------
     void initializeSolid(GridsHolder* gridsHolder);
 
+    bool firstExec = true;
+
     // REWRITE THIS
 
-    /// @brief a simple draw grid function
-    /// @brief a pointer to our VBO data
-    GLuint m_vboPointer=0;
     /// @brief store the size of the vbo data
     GLint m_vboSize=0;
     /// @brief size of the subVBO corresponding to a single cube
@@ -307,6 +304,10 @@ class OpenGLWidget: public QOpenGLWidget
     float verticalAngleOnMiddleClick;
     float verticalAngleOnRightClick;
 
+    void reset();
+
+    float cubeSize=0.05;
+
     // something that can be fed into the shader
     class FrameData{
 
@@ -379,7 +380,7 @@ class OpenGLWidget: public QOpenGLWidget
     size_t totalFrames = 0;
 
     // This will identify our vertex buffer
-    GLuint vertexbuffer;
+    GLuint vertexbuffer = 0;
 
     //temporary stuff you should delete later
     bool useTriangle = false;

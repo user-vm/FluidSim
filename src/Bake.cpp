@@ -1330,7 +1330,7 @@ std::vector<GLfloat> GridsHolder::solidToFaces(ngl::Vec3 minCoords, ngl::Vec3 ma
           }
     }
 
-  std::vector<GLfloat> faces = std::vector<GLfloat>(36*rectList.size());
+  std::vector<GLfloat> faces = std::vector<GLfloat>(24*rectList.size());
 
   float xDepth, xLeft, xBottom, xRight, xTop; //the position of the face in OpenGL space
 
@@ -1376,7 +1376,7 @@ std::vector<GLfloat> GridsHolder::solidToFaces(ngl::Vec3 minCoords, ngl::Vec3 ma
         }
       else{ //it is _NEG -> parse faces[] inversely
           inc = -1;
-          fiTemp = fi + 30;
+          fiTemp = fi + 20;
         }
 
       int fiColor = fi+3; //since all vertex colors in the two tris are the same, order of addition doesn't matter
@@ -1391,45 +1391,43 @@ std::vector<GLfloat> GridsHolder::solidToFaces(ngl::Vec3 minCoords, ngl::Vec3 ma
       faces[fiTemp+((axis+1)%3)] = xTop;
       faces[fiTemp+((axis+2)%3)] = xLeft;
 
-      fiTemp+=inc*6;
+      fiTemp+=inc*4;
 
       faces[fiTemp+(axis%3)] = xDepth;
       faces[fiTemp+((axis+1)%3)] = xTop;
       faces[fiTemp+((axis+2)%3)] = xRight;
 
-      fiTemp+=inc*6;
+      fiTemp+=inc*4;
 
       faces[fiTemp+(axis%3)] = xDepth;
       faces[fiTemp+((axis+1)%3)] = xBottom;
       faces[fiTemp+((axis+2)%3)] = xRight;
 
-      fiTemp+=inc*6;
+      fiTemp+=inc*4;
 
       //face B (1->3->4)
       faces[fiTemp+(axis%3)] = xDepth;
       faces[fiTemp+((axis+1)%3)] = xTop;
       faces[fiTemp+((axis+2)%3)] = xLeft;
 
-      fiTemp+=inc*6;
+      fiTemp+=inc*4;
 
       faces[fiTemp+(axis%3)] = xDepth;
       faces[fiTemp+((axis+1)%3)] = xBottom;
       faces[fiTemp+((axis+2)%3)] = xRight;
 
-      fiTemp+=inc*6;
+      fiTemp+=inc*4;
 
       faces[fiTemp+(axis%3)] = xDepth;
       faces[fiTemp+((axis+1)%3)] = xBottom;
       faces[fiTemp+((axis+2)%3)] = xLeft;
 
       for (int ind=0;ind<6;ind++){
-          faces[fiColor++] = (axis==0)?1.0f:0.0f;
-          faces[fiColor++] = (axis==1)?1.0f:0.0f;
-          faces[fiColor++] = (axis==2)?1.0f:0.0f;
+          faces[fiColor++] = float(axis-1);
           fiColor+=3;
         }
 
-      fi+=36;
+      fi+=24;
     }
 
   return faces;

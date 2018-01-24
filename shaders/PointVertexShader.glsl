@@ -21,6 +21,8 @@ void main(){
     else
         gl_PointSize = maxSize;
 
+    //gl_PointSize = pointSize * 10.0;
+
     vertexColorOut = pointColor;
 }
 
