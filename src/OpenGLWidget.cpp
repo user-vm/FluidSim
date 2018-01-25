@@ -58,7 +58,7 @@ void OpenGLWidget::initializeGL()
   glewInit();
 
   //glPushAttrib(GL_ALL_ATTRIB_BITS);
-  glClearColor(0.5f, 0.5f, 0.5f, 1.0f);			   // Grey Background
+  glClearColor(0.0f, 0.0f, 0.4f, 0.0f);			   // Grey Background
 
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_MULTISAMPLE);
@@ -85,10 +85,14 @@ void OpenGLWidget::initializeGL()
       std::cout<<viewMatrix[i][j]<<" ";
     std::cout<<"]\n";}
 
-  bake(cubeSize);
-  makePoints();
+  glViewport(m_xOffset,m_yOffset,m_width,m_height);
+  // Clear the screen
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_ACCUM_BUFFER_BIT);
 
   std::cout<<"m_width = "<<m_width<<"; m_height = "<<m_height<<"\n";
+
+  //bake(cubeSize);
+  //makePoints();
 }
 
 void OpenGLWidget::reset(){
@@ -98,7 +102,9 @@ void OpenGLWidget::reset(){
   cubeSize /=2;
 
   //glPopAttrib();
-  glDeleteBuffers(1,&vertexbuffer); //this actually doesn't work for some reason
+  //glDeleteBuffers(1,&vertexbuffer); //this actually doesn't work for some reason
+  //glBindVertexArray(0);
+  //glDeleteVertexArrays(1,&VertexArrayID);
   //glDeleteProgram(programID);
   //glDeleteProgram(pointProgramID);
   //glFlush();
@@ -167,15 +173,15 @@ void OpenGLWidget::makePoints()
     // Dark blue background
     glClearColor(0.0f, 0.0f, 0.4f, 0.0f);
 
+    //if(!firstExec){
     // Create and compile our GLSL program from the shaders
     programID = LoadShaders( "shaders/SimpleVertexShader.glsl", "shaders/SimpleFragmentShader.glsl" );
-    pointProgramID = LoadShaders("shaders/PointVertexShader.glsl", "shaders/PointFragmentShader.glsl");//, "shaders/PointGeometryShader.glsl");
+    pointProgramID = LoadShaders("shaders/PointVertexShader.glsl", "shaders/PointFragmentShader.glsl");//}//, "shaders/PointGeometryShader.glsl");
 
     GLuint VertexArrayID;
     glGenVertexArrays(1, &VertexArrayID);
     glBindVertexArray(VertexArrayID);
 
-    // Get a handle for our "MVP" uniform
     matrixID = glGetUniformLocation(programID, "MVP");
     matrixPointID = glGetUniformLocation(pointProgramID, "MVP");
     colorSolidXID = glGetUniformLocation(programID, "colorSolidX");
@@ -183,9 +189,13 @@ void OpenGLWidget::makePoints()
     colorSolidZID = glGetUniformLocation(programID, "colorSolidZ");
     maximumSizeID = glGetUniformLocation(pointProgramID, "maxSize");
     maximumSizeCutoffID = glGetUniformLocation(pointProgramID, "maxSizeCutoff");
-    pointColorID = glGetUniformLocation(pointProgramID, "pointColor");
+    pointColorID = glGetUniformLocation(pointProgramID, "pointColor");//}
 
-    std::cout<<glGetError()<<"\n";
+    //if(!firstExec){
+    // Get a handle for our "MVP" uniform
+
+
+    std::cout<<glGetError()<<"iouwersghvbuiogwesrv\n";
 
     static const GLfloat g_vertex_buffer_data[] = {
             -1.0f, -1.0f, 0.0f,
@@ -197,18 +207,33 @@ void OpenGLWidget::makePoints()
       solidFacesData[d1]+= 0.25 * (std::rand()*2.0/RAND_MAX-0.5); //adds a random float value between -0.25 and 0.25
     */
     // Generate 1 buffer, put the resulting identifier in vertexbuffer
+    //if(firstExec)
+    //glBindBuffer(GL_ARRAY_BUFFER, 0);
     glGenBuffers(1, &vertexbuffer);
     // The following commands will talk about our 'vertexbuffer' buffer
     glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
+
     // Give our vertices to OpenGL.
     if(useTriangle)
       glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_DYNAMIC_DRAW);
     else{
-      glBufferData(GL_ARRAY_BUFFER, (solidFacesData.size()+mainColorData.size())*sizeof(GLfloat), NULL, GL_STATIC_DRAW);
+      glBufferData(GL_ARRAY_BUFFER, (solidFacesData.size()+mainColorData.size())*sizeof(GLfloat), NULL, GL_DYNAMIC_DRAW);
       glBufferSubData(GL_ARRAY_BUFFER, 0, solidFacesData.size()*sizeof(GLfloat),solidFacesData.data());
       glBufferSubData(GL_ARRAY_BUFFER, solidFacesData.size()*sizeof(GLfloat), mainColorData.size()*sizeof(GLfloat),mainColorData.data());}
 
-    glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
+    //glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
+
+
+    //if(!firstExec)
+    //glBindBuffer(GL_ARRAY_BUFFER, 0);
+    /*else{
+        glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
+      //firstExec=false;
+      }*/
+
+    firstExec=false;
+
+
 }
 
 // from opengl-tutorial.org (distributed under a DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE)
@@ -440,6 +465,9 @@ void OpenGLWidget::paintGL()
   // Clear the screen
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_ACCUM_BUFFER_BIT);
 
+  if(firstExec)
+    return;
+
   // Use our shader
   glUseProgram(programID);
 
@@ -539,7 +567,7 @@ void OpenGLWidget::paintGL()
 
   glEnableVertexAttribArray(0);
   glEnableVertexAttribArray(1);
-  glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
+  //glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
 
   //now the vertex positions of the points
   glVertexAttribPointer(
@@ -808,7 +836,8 @@ void OpenGLWidget::keyPressEvent(QKeyEvent *_event)
             timerOffset += timer.elapsed() - lastPaused;
           }
         reset();
-        glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
+
+        //glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
         break;
       }
     case ',':{
@@ -1379,11 +1408,11 @@ std::vector<GLfloat> OpenGLWidget::FrameData::dataToGLfloat(GLfloatTransformatio
           for(size_t i_y=0;i_y<y_Size;i_y++)
             for(size_t i_z=0;i_z<z_Size;i_z++,k2++){
 
-              //if(data[k2]){
+              if(data[k2]){
                   floatData.push_back((minCoords.m_x*(x_Size-i_x-0.5)+maxCoords.m_x*(i_x+0.5))/x_Size);
                   floatData.push_back((minCoords.m_y*(y_Size-i_y-0.5)+maxCoords.m_y*(i_y+0.5))/y_Size);
                   floatData.push_back((minCoords.m_z*(z_Size-i_z-0.5)+maxCoords.m_z*(i_z+0.5))/z_Size);
-                  floatData.push_back((maxVal==0)?0:(data[k2]/maxVal));}
+                  floatData.push_back((maxVal==0)?0:(data[k2]/maxVal));}}
 
         pointFrameOffset[i_fr+1] = floatData.size()/4;}
 

@@ -74,6 +74,10 @@ class OpenGLWidget: public QOpenGLWidget
       GLfloat axis; //negative value means X, value 0 means Y, positive value means Z
     };
 
+    //GLuint VertexArrayID;
+
+
+
   private:
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief event called by the timer to allow use to re-draw / animate
