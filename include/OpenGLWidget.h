@@ -48,15 +48,21 @@ class OpenGLWidget: public QOpenGLWidget
 
     GLuint pointProgramID;
 
+    GLuint lineProgramID;
+
     //IDs for uniform
     GLint matrixID;
     GLint matrixPointID;
+    GLint matrixLineID;
     GLint maximumSizeID;
     GLint maximumSizeCutoffID;
     GLint colorSolidXID;
     GLint colorSolidYID;
     GLint colorSolidZID;
     GLint pointColorID;
+    GLint lineColorID;
+
+    bool isBaked = false;
 
     GLfloat maximumSize = 10.0f;
     GLfloat maximumSizeCutoff = 20.0f;
@@ -64,6 +70,7 @@ class OpenGLWidget: public QOpenGLWidget
     glm::vec3 colorSolidY = glm::vec3(0.0,1.0,0.0);
     glm::vec3 colorSolidZ = glm::vec3(0.0,0.0,1.0);
     glm::vec3 pointColor = glm::vec3(1.0,1.0,0.0);
+    glm::vec3 colorSimBoundLine = glm::vec3(1.0,1.0,1.0);
 
     std::vector<GLint> pointFrameOffset;
 
@@ -76,7 +83,44 @@ class OpenGLWidget: public QOpenGLWidget
 
     //GLuint VertexArrayID;
 
+    std::vector<GLfloat> makeCubeData(GLfloat xMin, GLfloat yMin, GLfloat zMin, GLfloat xMax, GLfloat yMax, GLfloat zMax);
 
+    void loadSolidsAndInitialSmoke(float _size);
+
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief the frame duration (1/framerate)
+    //----------------------------------------------------------------------------------------------------------------------
+    float frameDuration = 1.0 / 25.0;
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief the total time to simulate
+    //----------------------------------------------------------------------------------------------------------------------
+    float totalSimTime=1.0;
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief the timestep
+    //----------------------------------------------------------------------------------------------------------------------
+    float dt = 1E-2;
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief function to free baked fluid simulation
+    //----------------------------------------------------------------------------------------------------------------------
+    void freeBake();
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief function to update scene after a change to simulation conditions (sizes, solid positions, ...)
+    //----------------------------------------------------------------------------------------------------------------------
+    void resetWithoutBaking();
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief function to scale solids and inflows
+    //----------------------------------------------------------------------------------------------------------------------
+    void resizeSimulation(size_t newSizeX, size_t newSizeY, size_t newSizeZ, size_t resizeMethod);
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief a helper enum for resizing
+    //----------------------------------------------------------------------------------------------------------------------
+    enum ResizeMethod{SCALE=0,CENTER=1,DO_NOT_MOVE=2};
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief grid cell size
+    //----------------------------------------------------------------------------------------------------------------------
+    float dx;
+    /// @brief size of the simulation in grid cells in x, y and z, respectively
+    GLint xSimSize=20, ySimSize=20, zSimSize=20;
 
   private:
     //----------------------------------------------------------------------------------------------------------------------
@@ -151,8 +195,6 @@ class OpenGLWidget: public QOpenGLWidget
     GLint m_solidVboSize;
     /// @brief size of the VBO portion corresponding to the fluid points (when doing the GL_POINTS render)
     GLint m_fluidVboSize;
-    /// @brief size of the simulation in grid cells in x, y and z, respectively
-    GLint xSimSize=20, ySimSize=20, zSimSize=20;
     /// @brief ID of shader program
     GLint shaderProgramID=0;
     //----------------------------------------------------------------------------------------------------------------------
@@ -193,21 +235,9 @@ class OpenGLWidget: public QOpenGLWidget
     //----------------------------------------------------------------------------------------------------------------------
     std::vector<std::vector<std::vector<std::vector<float>>>> tm;
     //----------------------------------------------------------------------------------------------------------------------
-    /// @brief the timestep
-    //----------------------------------------------------------------------------------------------------------------------
-    float dt = 1E-2;
-    //----------------------------------------------------------------------------------------------------------------------
-    /// @brief the frame duration (1/framerate)
-    //----------------------------------------------------------------------------------------------------------------------
-    float frameDuration = 1.0 / 25.0;
-    //----------------------------------------------------------------------------------------------------------------------
     /// @brief the current simulation time
     //----------------------------------------------------------------------------------------------------------------------
     float simTime=0.0;
-    //----------------------------------------------------------------------------------------------------------------------
-    /// @brief the total time to simulate
-    //----------------------------------------------------------------------------------------------------------------------
-    float totalSimTime=1.0;
     //----------------------------------------------------------------------------------------------------------------------
     /// @brief the default gravitational acceleration
     //----------------------------------------------------------------------------------------------------------------------
@@ -235,10 +265,6 @@ class OpenGLWidget: public QOpenGLWidget
     //----------------------------------------------------------------------------------------------------------------------
     float rho = 0.0001;
     //----------------------------------------------------------------------------------------------------------------------
-    /// @brief grid cell size
-    //----------------------------------------------------------------------------------------------------------------------
-    float dx;
-    //----------------------------------------------------------------------------------------------------------------------
     /// @brief size of points for display
     //----------------------------------------------------------------------------------------------------------------------
     float pointSize;
@@ -265,6 +291,10 @@ class OpenGLWidget: public QOpenGLWidget
     std::vector<GLfloat> mainColorData;
 
     std::vector<GLfloat> solidFacesData;
+
+    std::vector<GLfloat> simSpaceLinesData;
+
+    std::vector<GLfloat> wallCubeData;
 
     // Initial position : on -Z
     const glm::vec3 initialPosition = glm::vec3( -2, 0, 0 );
@@ -308,9 +338,18 @@ class OpenGLWidget: public QOpenGLWidget
     float verticalAngleOnMiddleClick;
     float verticalAngleOnRightClick;
 
-    void reset();
-
     float cubeSize=0.05;
+
+    struct GridBox{
+      size_t minX;
+      size_t minY;
+      size_t minZ;
+      size_t maxX;
+      size_t maxY;
+      size_t maxZ;
+    };
+
+    std::vector<GridBox> inflows;
 
     // something that can be fed into the shader
     class FrameData{
@@ -337,6 +376,8 @@ class OpenGLWidget: public QOpenGLWidget
 
       bool addFrame(GridsHolder* gridsHolder, std::string gridName);
       bool addFrame(GridsHolder* gridsHolder, std::string gridName, size_t index);
+
+      void removeAllButFirstFrame();
 
       std::vector<GLfloat> dataToGLfloat(GLfloatTransformationMethod method, std::vector<GLint> &pointFrameOffset, ngl::Vec3 minCoords, ngl::Vec3 maxCoords);
 
@@ -392,6 +433,14 @@ class OpenGLWidget: public QOpenGLWidget
 signals:
 
 public slots:
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief clears everything and starts the baking process
+    //----------------------------------------------------------------------------------------------------------------------
+    void reset();
+
+    //----------------------------------------------------------------------------------------------------------------------
+    /// @brief resets the camera position
+    //----------------------------------------------------------------------------------------------------------------------
     void resetCamera();
 };
 

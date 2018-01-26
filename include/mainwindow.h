@@ -18,6 +18,16 @@ public:
 
 public slots:
   //void resetCamera();
+  void showControls();
+  void showBouyancyParamsHelp();
+  void updateNumFrames();
+  void updateFrameDuration();
+  void updateTimestep();
+  void updateFramerate();
+  void bake();
+  void freeBake();
+  void updateVoxelSize();
+  void updateSimSizeVoxel();
 
 private:
   Ui::MainWindow *ui;

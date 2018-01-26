@@ -1,9 +1,7 @@
 #include "OpenGLWidget.h"
 
 /*
- * Basic GL Widget modified from the example here
- * http://qt-project.org/doc/qt-5.0/qtgui/openglwindow.html
- * adapted to use NGL
+ * Basic smoke simulator with GUI. Doesn't work. Probably never will.
  */
 #include "OpenGLWidget.h"
 #include <QKeyEvent>
@@ -91,15 +89,18 @@ void OpenGLWidget::initializeGL()
 
   std::cout<<"m_width = "<<m_width<<"; m_height = "<<m_height<<"\n";
 
+  inflows = std::vector<GridBox>();
+
+  loadSolidsAndInitialSmoke(cubeSize);
   //bake(cubeSize);
-  //makePoints();
+  makePoints();
 }
 
 void OpenGLWidget::reset(){
 
   //glewInit();
 
-  cubeSize /=2;
+  //cubeSize /=2;
 
   //glPopAttrib();
   //glDeleteBuffers(1,&vertexbuffer); //this actually doesn't work for some reason
@@ -162,9 +163,80 @@ void OpenGLWidget::reset(){
   //pointSize = GLfloat(m_viewport[3])/2.0*cubeSize*10;
 
   bake(cubeSize);
+
+  isBaked = true;
   makePoints();
 
   std::cout<<"m_width = "<<m_width<<"; m_height = "<<m_height<<"\n";
+}
+
+std::vector<GLfloat> OpenGLWidget::makeCubeData(GLfloat xMin, GLfloat yMin, GLfloat zMin, GLfloat xMax, GLfloat yMax, GLfloat zMax){
+
+  std::vector<GLfloat> cubeData = {//std::vector<GLfloat>(3*3*2*6);
+                                   //12 triangles, two for each face
+                                   //face z=-0.5
+                                  xMax,yMax,zMin,
+                                  xMin,yMax,zMin,
+                                  xMin,yMin,zMin, //+1
+                                  xMax,yMax,zMin,
+                                  xMax,yMin,zMin,
+                                  xMin,yMin,zMin, //-1
+                                   //face z=0.5
+                                  xMax,yMax,zMax,
+                                  xMin,yMax,zMax,
+                                  xMin,yMin,zMax, //
+                                  xMax,yMax,zMax,
+                                  xMax,yMin,zMax,
+                                  xMin,yMin,zMax,
+                                   //face x=-0.5
+                                  xMin,yMax,zMax,
+                                  xMin,yMin,zMax,
+                                  xMin,yMin,zMin,
+                                  xMin,yMax,zMax,
+                                  xMin,yMax,zMin,
+                                  xMin,yMin,zMin,
+                                   //face x=0.5
+                                  xMax,yMax,zMax,
+                                  xMax,yMin,zMax,
+                                  xMax,yMin,zMin,
+                                  xMax,yMax,zMax,
+                                  xMax,yMax,zMin,
+                                  xMax,yMin,zMin,
+                                   //face y=-0.5
+                                  xMax,yMin,zMax,
+                                  xMin,yMin,zMax,
+                                  xMin,yMin,zMin,
+                                  xMax,yMin,zMax,
+                                  xMax,yMin,zMin,
+                                  xMin,yMin,zMin,
+                                   //face y=0.5
+                                  xMax,yMax,zMax,
+                                  xMin,yMax,zMax,
+                                  xMin,yMax,zMin,
+                                  xMax,yMax,zMax,
+                                  xMax,yMax,zMin,
+                                  xMin,yMax,zMin
+                                  };
+
+  return cubeData;
+/*
+  for(i=0;i<cubeData.size();i+=3)
+    if(cubeData[i]<0)
+      cubeData[i] = xMin;
+    else
+      cubeData[i] = xMax;
+
+  for(i=1;i<cubeData.size();i+=3)
+    if(cubeData[i]<0)
+      cubeData[i] = yMin;
+    else
+      cubeData[i] = yMax;
+
+  for(i=2;i<cubeData.size();i+=3)
+    if(cubeData[i]<0)
+      cubeData[i] = zMin;
+    else
+      cubeData[i] = zMax;*/
 }
 
 void OpenGLWidget::makePoints()
@@ -177,6 +249,7 @@ void OpenGLWidget::makePoints()
     // Create and compile our GLSL program from the shaders
     programID = LoadShaders( "shaders/SimpleVertexShader.glsl", "shaders/SimpleFragmentShader.glsl" );
     pointProgramID = LoadShaders("shaders/PointVertexShader.glsl", "shaders/PointFragmentShader.glsl");//}//, "shaders/PointGeometryShader.glsl");
+    lineProgramID = LoadShaders("shaders/LineVertexShader.glsl","shaders/LineFragmentShader.glsl");
 
     GLuint VertexArrayID;
     glGenVertexArrays(1, &VertexArrayID);
@@ -184,12 +257,14 @@ void OpenGLWidget::makePoints()
 
     matrixID = glGetUniformLocation(programID, "MVP");
     matrixPointID = glGetUniformLocation(pointProgramID, "MVP");
+    matrixLineID = glGetUniformLocation(lineProgramID, "MVP");
     colorSolidXID = glGetUniformLocation(programID, "colorSolidX");
     colorSolidYID = glGetUniformLocation(programID, "colorSolidY");
     colorSolidZID = glGetUniformLocation(programID, "colorSolidZ");
     maximumSizeID = glGetUniformLocation(pointProgramID, "maxSize");
     maximumSizeCutoffID = glGetUniformLocation(pointProgramID, "maxSizeCutoff");
     pointColorID = glGetUniformLocation(pointProgramID, "pointColor");//}
+    lineColorID = glGetUniformLocation(lineProgramID, "lineColor");
 
     //if(!firstExec){
     // Get a handle for our "MVP" uniform
@@ -217,9 +292,58 @@ void OpenGLWidget::makePoints()
     if(useTriangle)
       glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_DYNAMIC_DRAW);
     else{
-      glBufferData(GL_ARRAY_BUFFER, (solidFacesData.size()+mainColorData.size())*sizeof(GLfloat), NULL, GL_DYNAMIC_DRAW);
-      glBufferSubData(GL_ARRAY_BUFFER, 0, solidFacesData.size()*sizeof(GLfloat),solidFacesData.data());
-      glBufferSubData(GL_ARRAY_BUFFER, solidFacesData.size()*sizeof(GLfloat), mainColorData.size()*sizeof(GLfloat),mainColorData.data());}
+
+      uint dataOffset = 0;
+
+      //a wireframe cube that shows the bounds of the simulation region
+      simSpaceLinesData = {
+        //upper square (perpendicular to y-axis)
+         xSimSize/2.0f, ySimSize/2.0f, zSimSize/2.0f,   -xSimSize/2.0f, ySimSize/2.0f, zSimSize/2.0f,
+        -xSimSize/2.0f, ySimSize/2.0f, zSimSize/2.0f,   -xSimSize/2.0f, ySimSize/2.0f,-zSimSize/2.0f,
+        -xSimSize/2.0f, ySimSize/2.0f,-zSimSize/2.0f,    xSimSize/2.0f, ySimSize/2.0f,-zSimSize/2.0f,
+         xSimSize/2.0f, ySimSize/2.0f,-zSimSize/2.0f,    xSimSize/2.0f, ySimSize/2.0f, zSimSize/2.0f,
+
+        //lower square (perpendicular to y-axis)
+         xSimSize/2.0f,-ySimSize/2.0f, zSimSize/2.0f,   -xSimSize/2.0f,-ySimSize/2.0f, zSimSize/2.0f,
+        -xSimSize/2.0f,-ySimSize/2.0f, zSimSize/2.0f,   -xSimSize/2.0f,-ySimSize/2.0f,-zSimSize/2.0f,
+        -xSimSize/2.0f,-ySimSize/2.0f,-zSimSize/2.0f,    xSimSize/2.0f,-ySimSize/2.0f,-zSimSize/2.0f,
+         xSimSize/2.0f,-ySimSize/2.0f,-zSimSize/2.0f,    xSimSize/2.0f,-ySimSize/2.0f, zSimSize/2.0f,
+
+        //sides parallel to y-axis
+         xSimSize/2.0f, ySimSize/2.0f, zSimSize/2.0f,    xSimSize/2.0f,-ySimSize/2.0f, zSimSize/2.0f,
+        -xSimSize/2.0f, ySimSize/2.0f, zSimSize/2.0f,   -xSimSize/2.0f,-ySimSize/2.0f, zSimSize/2.0f,
+        -xSimSize/2.0f, ySimSize/2.0f,-zSimSize/2.0f,   -xSimSize/2.0f,-ySimSize/2.0f,-zSimSize/2.0f,
+         xSimSize/2.0f, ySimSize/2.0f,-zSimSize/2.0f,    xSimSize/2.0f,-ySimSize/2.0f,-zSimSize/2.0f
+      };
+
+      for(size_t i=0;i<simSpaceLinesData.size();i++)
+        simSpaceLinesData[i] *= cubeSize;
+
+      //this is a box used to define new solid cells to be added or removed, only drawn when solid cells are being added/removed
+      wallCubeData = makeCubeData(-xSimSize/2.0*cubeSize,-ySimSize/2.0*cubeSize,-zSimSize/2.0*cubeSize,
+                                  (-xSimSize/2.0+1.0)*cubeSize,(-ySimSize/2.0+1.0)*cubeSize,(-zSimSize/2.0+1.0)*cubeSize);
+
+      //cubes have the same data size, so wallCubeData has the same size as each of the inflow cubes
+      glBufferData(GL_ARRAY_BUFFER, (simSpaceLinesData.size()+wallCubeData.size()*(1+inflows.size())+solidFacesData.size()+mainColorData.size())*sizeof(GLfloat), NULL, GL_DYNAMIC_DRAW);
+
+      for(auto i: {simSpaceLinesData, wallCubeData, solidFacesData, mainColorData}){
+          glBufferSubData(GL_ARRAY_BUFFER, dataOffset, i.size()*sizeof(GLfloat),i.data());
+          dataOffset+=i.size()*sizeof(GLfloat);
+        }
+
+      std::vector<GLfloat> inflowCube;
+
+      for(size_t i=0;i<inflows.size();i++){
+          inflowCube = makeCubeData((-xSimSize/2.0+inflows[i].minX)*cubeSize,
+                                (-ySimSize/2.0+inflows[i].minY)*cubeSize,
+                                (-zSimSize/2.0+inflows[i].minZ)*cubeSize,
+                                (-xSimSize/2.0+inflows[i].maxX+1)*cubeSize,
+                                (-ySimSize/2.0+inflows[i].maxY+1)*cubeSize,
+                                (-zSimSize/2.0+inflows[i].maxZ+1)*cubeSize);
+          glBufferSubData(GL_ARRAY_BUFFER, dataOffset, inflowCube.size()*sizeof(GLfloat), inflowCube.data());
+          dataOffset += inflowCube.size()*sizeof(GLfloat);
+        }
+    }
 
     //glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
 
@@ -331,129 +455,6 @@ GLuint OpenGLWidget::LoadShaders(const char * vertex_file_path,const char * frag
 	return ProgramID;
 }
 
-// modified from opengl-tutorial.org (original distributed under a DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE)
-GLuint OpenGLWidget::LoadPointShaders(const char * vertex_file_path,const char * fragment_file_path, const char * geometry_file_path){
-
-	// Create the shaders
-	GLuint VertexShaderID = glCreateShader(GL_VERTEX_SHADER);
-	GLuint FragmentShaderID = glCreateShader(GL_FRAGMENT_SHADER);
-	GLuint GeometryShaderID = glCreateShader(GL_GEOMETRY_SHADER);
-
-	// Read the Vertex Shader code from the file
-	std::string VertexShaderCode;
-	std::ifstream VertexShaderStream(vertex_file_path, std::ios::in);
-	if(VertexShaderStream.is_open()){
-		std::stringstream sstr;
-		sstr << VertexShaderStream.rdbuf();
-		VertexShaderCode = sstr.str();
-		VertexShaderStream.close();
-	}else{
-		printf("Impossible to open %s. Are you in the right directory ? Don't forget to read the FAQ !\n", vertex_file_path);
-		getchar();
-		return 0;
-	}
-
-	// Read the Fragment Shader code from the file
-	std::string FragmentShaderCode;
-	std::ifstream FragmentShaderStream(fragment_file_path, std::ios::in);
-	if(FragmentShaderStream.is_open()){
-		std::stringstream sstr;
-		sstr << FragmentShaderStream.rdbuf();
-		FragmentShaderCode = sstr.str();
-		FragmentShaderStream.close();
-	}
-
-	// Read the Fragment Shader code from the file
-	std::string GeometryShaderCode;
-	std::ifstream GeometryShaderStream(fragment_file_path, std::ios::in);
-	if(FragmentShaderStream.is_open()){
-		std::stringstream sstr;
-		sstr << GeometryShaderStream.rdbuf();
-		GeometryShaderCode = sstr.str();
-		GeometryShaderStream.close();
-	}
-
-	GLint Result = GL_FALSE;
-	int InfoLogLength;
-
-
-	// Compile Vertex Shader
-	printf("Compiling shader : %s\n", vertex_file_path);
-	char const * VertexSourcePointer = VertexShaderCode.c_str();
-	glShaderSource(VertexShaderID, 1, &VertexSourcePointer , NULL);
-	glCompileShader(VertexShaderID);
-
-	// Check Vertex Shader
-	glGetShaderiv(VertexShaderID, GL_COMPILE_STATUS, &Result);
-	glGetShaderiv(VertexShaderID, GL_INFO_LOG_LENGTH, &InfoLogLength);
-	if ( InfoLogLength > 0 ){
-		std::vector<char> VertexShaderErrorMessage(InfoLogLength+1);
-		glGetShaderInfoLog(VertexShaderID, InfoLogLength, NULL, &VertexShaderErrorMessage[0]);
-		printf("%s\n", &VertexShaderErrorMessage[0]);
-	}
-
-
-
-	// Compile Fragment Shader
-	printf("Compiling shader : %s\n", fragment_file_path);
-	char const * FragmentSourcePointer = FragmentShaderCode.c_str();
-	glShaderSource(FragmentShaderID, 1, &FragmentSourcePointer , NULL);
-	glCompileShader(FragmentShaderID);
-
-	// Check Fragment Shader
-	glGetShaderiv(FragmentShaderID, GL_COMPILE_STATUS, &Result);
-	glGetShaderiv(FragmentShaderID, GL_INFO_LOG_LENGTH, &InfoLogLength);
-	if ( InfoLogLength > 0 ){
-		std::vector<char> FragmentShaderErrorMessage(InfoLogLength+1);
-		glGetShaderInfoLog(FragmentShaderID, InfoLogLength, NULL, &FragmentShaderErrorMessage[0]);
-		printf("%s\n", &FragmentShaderErrorMessage[0]);
-	}
-
-	// Compile Geometry Shader
-	printf("Compiling shader : %s\n", geometry_file_path);
-	char const * GeometrySourcePointer = GeometryShaderCode.c_str();
-	glShaderSource(GeometryShaderID, 1, &GeometrySourcePointer , NULL);
-	glCompileShader(GeometryShaderID);
-
-	// Check Geometry Shader
-	glGetShaderiv(GeometryShaderID, GL_COMPILE_STATUS, &Result);
-	glGetShaderiv(GeometryShaderID, GL_INFO_LOG_LENGTH, &InfoLogLength);
-	if ( InfoLogLength > 0 ){
-		std::vector<char> GeometryShaderErrorMessage(InfoLogLength+1);
-		glGetShaderInfoLog(GeometryShaderID, InfoLogLength, NULL, &GeometryShaderErrorMessage[0]);
-		printf("%s\n", &GeometryShaderErrorMessage[0]);
-	}
-
-	// Link the program
-	printf("Linking program\n");
-	GLuint ProgramID = glCreateProgram();
-	glAttachShader(ProgramID, VertexShaderID);
-	glAttachShader(ProgramID, FragmentShaderID);
-	glAttachShader(ProgramID, GeometryShaderID);
-	glLinkProgram(ProgramID);
-
-	// Check the program
-	glGetProgramiv(ProgramID, GL_LINK_STATUS, &Result);
-	glGetProgramiv(ProgramID, GL_INFO_LOG_LENGTH, &InfoLogLength);
-	if ( InfoLogLength > 0 ){
-		std::vector<char> ProgramErrorMessage(InfoLogLength+1);
-		glGetProgramInfoLog(ProgramID, InfoLogLength, NULL, &ProgramErrorMessage[0]);
-		printf("%s\n", &ProgramErrorMessage[0]);
-	}
-
-
-	glDetachShader(ProgramID, VertexShaderID);
-	glDetachShader(ProgramID, FragmentShaderID);
-	glDetachShader(ProgramID, GeometryShaderID);
-
-	glDeleteShader(VertexShaderID);
-	glDeleteShader(FragmentShaderID);
-	glDeleteShader(GeometryShaderID);
-
-
-	return ProgramID;
-}
-
 //from opengl-tutorial.org
 
 int a_value=0;
@@ -469,7 +470,7 @@ void OpenGLWidget::paintGL()
     return;
 
   // Use our shader
-  glUseProgram(programID);
+
 
   //sleep(1);
 
@@ -498,6 +499,30 @@ void OpenGLWidget::paintGL()
 
   glm::mat4 MVP = glm::mat4(1.0);
   MVP = projectionMatrix * viewMatrix * modelMatrix;
+
+  glUseProgram(lineProgramID);
+
+  glUniformMatrix4fv(matrixLineID, 1, GL_FALSE, &MVP[0][0]);
+  glUniform3fv(lineColorID,1, glm::value_ptr(colorSimBoundLine));
+
+  glEnableVertexAttribArray(0);
+  glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer); //this needs to be here because otherwise the deleted buffer comes back from the dead and gets used
+
+  glVertexAttribPointer(
+        0,
+        3,
+        GL_FLOAT,
+        GL_FALSE,
+        3*sizeof(GLfloat),
+        (void*)0);
+
+  std::cout<<glGetError()<<" line\n";
+
+  glDrawArrays(GL_LINES, 0, simSpaceLinesData.size()/3);
+
+  glDisableVertexAttribArray(0);
+
+  glUseProgram(programID);
 /*
   std::cout<<"\nMVP=\n";
   for(int i=0;i<4;i++){
@@ -529,7 +554,7 @@ void OpenGLWidget::paintGL()
   std::cout<<glGetError()<<"x\n";
 
   //glEnableClientState(GL_COLOR_ARRAY);
-  glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer); //this needs to be here because otherwise the deleted buffer comes back from the dead and gets used
+
 
   //first the vertex positions
   glVertexAttribPointer(
@@ -538,7 +563,7 @@ void OpenGLWidget::paintGL()
      GL_FLOAT,           // type
      GL_FALSE,           // normalized?
      4*sizeof(GLfloat),  // stride
-     (void*)0            // array buffer offset
+     (void*)((simSpaceLinesData.size()+wallCubeData.size())*sizeof(GLfloat))            // array buffer offset
   );
 
   //now the color
@@ -548,7 +573,7 @@ void OpenGLWidget::paintGL()
         GL_INT,
         GL_FALSE,
         4*sizeof(GLfloat),
-        (void*)(3*sizeof(GLfloat)));
+        (void*)((3+simSpaceLinesData.size()+wallCubeData.size())*sizeof(GLfloat)));
 
   if(useTriangle)
     glDrawArrays(GL_TRIANGLES, 0, 3);
@@ -576,7 +601,7 @@ void OpenGLWidget::paintGL()
         GL_FLOAT,
         GL_FALSE,
         4*sizeof(GLfloat),
-        (void*)(solidFacesData.size()*sizeof(GLfloat)));
+        (void*)((simSpaceLinesData.size()+solidFacesData.size()+wallCubeData.size())*sizeof(GLfloat)));
         /*
         7*sizeof(GLfloat),
         (void*)(solidFacesData.size()*sizeof(GLfloat)));*/
@@ -588,7 +613,7 @@ void OpenGLWidget::paintGL()
         GL_FLOAT,
         GL_FALSE,
         4*sizeof(GLfloat),
-        (void*)((3+solidFacesData.size())*sizeof(GLfloat)));
+        (void*)((3+simSpaceLinesData.size()+solidFacesData.size()+wallCubeData.size())*sizeof(GLfloat)));
         /*
         7*sizeof(GLfloat),
         (void*)((3+solidFacesData.size())*sizeof(GLfloat)));*/
@@ -597,7 +622,9 @@ void OpenGLWidget::paintGL()
   //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   glEnable(GL_PROGRAM_POINT_SIZE);
 
-  uint currentFrame = int(timer.elapsed()/(frameDuration*1000.0)-timerOffset)%totalFrames;
+  uint currentFrame;
+
+  currentFrame = int(timer.elapsed()/(frameDuration*1000.0)-timerOffset)%totalFrames;
 
   std::cout<<pointFrameOffset[currentFrame];
   //std::cout<<
@@ -827,6 +854,8 @@ void OpenGLWidget::keyPressEvent(QKeyEvent *_event)
     case Qt::Key_Escape : QApplication::exit(EXIT_SUCCESS); break;
     case ' ' : {
         //pause or play
+        if(!isBaked)
+          return;
         if(isPlaying){
             isPlaying = false;
             lastPaused = timer.elapsed();
@@ -835,7 +864,6 @@ void OpenGLWidget::keyPressEvent(QKeyEvent *_event)
             isPlaying = true;
             timerOffset += timer.elapsed() - lastPaused;
           }
-        reset();
 
         //glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
         break;
@@ -1075,6 +1103,109 @@ void OpenGLWidget::initializeSolid(GridsHolder *gridsHolder){
         w->setOld(i,j,k,std::fabs(((z_Size*1.0)/2.0-k)/z_Size));
 
 }*/
+
+void OpenGLWidget::loadSolidsAndInitialSmoke(float _size){
+
+  float dx = cubeSize;
+
+  ngl::Vec3 gDep = g;
+
+  switch(fluidType){
+    case WATER:{
+        at = 0.0;
+        bt = 0.0;
+        gDep = g;
+        break;
+      }
+    case SMOKE:{
+        gDep = 0.0;
+        break;
+      }
+    case MIX:{}
+    }
+
+  std::vector<std::unique_ptr<GridTuple>> gridsToMake;
+
+  gridsToMake.push_back(std::unique_ptr<GridTuple>(new GridTuple("sc",GRID_3D_TWOSTEP,xSimSize,ySimSize,zSimSize)));
+
+  ngl::Vec3 solidGridSize = ngl::Vec3(xSimSize,ySimSize,zSimSize);
+
+  std::unique_ptr<GridsHolder> grids = std::unique_ptr<GridsHolder>(new GridsHolder(std::move(gridsToMake), dx, dt, tol, maxIterations, rho, gDep, at, bt, solidGridSize));
+
+  initializeSmokeConcentration(grids.get());
+  initializeSolid(grids.get());
+
+  mainFrameData = std::unique_ptr<FrameData>(new FrameData(xSimSize,ySimSize,zSimSize));
+
+  if(fluidType==WATER){
+      mainFrameData->addFrame(grids.get(),"p");
+    }
+  else{
+      mainFrameData->addFrame(grids.get(),"sc");
+    }
+
+  // prepare A matrix; since walls are not implemented yet, all diag values will be 6, and all other values will be -1, except at the (xSimSize-1, ySimSize-1, zSimSize-1) corner
+
+  solidFacesData = grids->solidToFaces(-xSimSize/2.0*_size,-ySimSize/2.0*_size,-zSimSize/2.0*_size,xSimSize/2.0*_size,ySimSize/2.0*_size,zSimSize/2.0*_size);
+
+  grids.reset();
+
+  mainColorData = mainFrameData->dataToGLfloat(FrameData::CENTER_POINTS,
+                                               pointFrameOffset,
+                                               ngl::Vec3(-xSimSize/2.0*_size,-ySimSize/2.0*_size,-zSimSize/2.0*_size),
+                                               ngl::Vec3(xSimSize/2.0*_size,ySimSize/2.0*_size,zSimSize/2.0*_size));
+
+  totalFrames = 1;
+
+  startTimer(frameDuration*1000);
+  timer.start();
+}
+
+void OpenGLWidget::freeBake(){
+
+  mainFrameData->removeAllButFirstFrame();
+  isBaked = false;
+  loadSolidsAndInitialSmoke(cubeSize);
+  //bake(cubeSize);
+  makePoints();
+}
+
+void OpenGLWidget::resetWithoutBaking(){
+
+  isBaked = false;
+  loadSolidsAndInitialSmoke(cubeSize);
+  //bake(cubeSize);
+  makePoints();
+}
+
+void OpenGLWidget::resizeSimulation(size_t newSizeX, size_t newSizeY, size_t newSizeZ, size_t resizeMethod){
+
+  ResizeMethod rMethod = static_cast<ResizeMethod>(resizeMethod);
+
+  switch(rMethod){
+    case SCALE: {
+      for(int i=0;i<inflows.size();i++){
+        inflows[i].maxX = int(round(inflows[i].maxX * newSizeX * 1.0 / xSimSize));
+        inflows[i].minX = int(round(inflows[i].minX * newSizeX * 1.0 / xSimSize));
+
+        inflows[i].maxY = int(round(inflows[i].maxY * newSizeY * 1.0 / ySimSize));
+        inflows[i].minY = int(round(inflows[i].minY * newSizeY * 1.0 / ySimSize));
+
+        inflows[i].maxZ = int(round(inflows[i].maxZ * newSizeZ * 1.0 / zSimSize));
+        inflows[i].minZ = int(round(inflows[i].minZ * newSizeZ * 1.0 / zSimSize));
+        }
+
+
+      }
+    case CENTER:{
+
+      }
+    case DO_NOT_MOVE:{
+
+      }
+    }
+
+}
 
 void OpenGLWidget::bake(float _size){
 
@@ -1422,4 +1553,11 @@ std::vector<GLfloat> OpenGLWidget::FrameData::dataToGLfloat(GLfloatTransformatio
 
 size_t OpenGLWidget::FrameData::numFrames(){
   return num_Frames;
+}
+
+void OpenGLWidget::FrameData::removeAllButFirstFrame(){
+
+  data.resize(x_Size*y_Size*z_Size);
+
+  num_Frames = 1;
 }

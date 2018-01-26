@@ -77,4 +77,6 @@ DISTFILES += \
     shaders/PointFragmentShader.glsl \
     shaders/PointVertexShader.glsl \
     shaders/PhongFragment.glsl \
-    shaders/PhongVertex.glsl
+    shaders/PhongVertex.glsl \
+    shaders/LineVertexShader.glsl \
+    shaders/LineFragmentShader.glsl
